@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CrossPoint Sleep Screen Converter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #0d0d0f;
+      --panel:     #141416;
+      --surface:   #1c1c20;
+      --border:    #25252b;
+      --border2:   #2e2e36;
+      --accent:    #e8e8ea;
+      --accent-dim:#c8c8cc;
+      --text:      #e4e4e8;
+      --muted:     #5a5a68;
+      --muted2:    #3a3a46;
+      --snap:      rgba(251,191,36,0.9);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 24px 56px;
+    }
+
+    /* ── Header ─────────────────────────────────── */
+    header {
+      width: 100%;
+      max-width: 860px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+    }
+
+    /* ── App shell ────────────────────────────────── */
+    .app {
+      width: 100%;
+      max-width: 1180px;
+      display: grid;
+      grid-template-columns: 1fr 190px 320px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* ── Left column ─────────────────────────────── */
+    .left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ── Drop zone ─────────────────────────────────── */
+    .drop-zone {
+      width: 100%;
+      min-height: 140px;
+      border: 1.5px dashed var(--border2);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 24px;
+    }
+    .drop-zone:hover, .drop-zone.over {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.04);
+      color: var(--text);
+    }
+    .drop-zone svg { width: 24px; height: 24px; stroke: currentColor; opacity: 0.7; }
+    .drop-zone small {
+      font-size: 0.72rem;
+      color: var(--muted2);
+      margin-top: -4px;
+    }
+    #fileInput { display: none; }
+
+    /* ── Source editor ────────────────────────────── */
+    .editor-section { display: none; width: 100%; }
+    .editor-section.visible { display: flex; flex-direction: column; align-items: center; }
+
+    .source-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0;  /* handled by source-header gap */
+    }
+
+    .change-btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.65rem;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 2px 7px;
+      cursor: pointer;
+      transition: color 0.1s, border-color 0.1s;
+      line-height: 1.6;
+    }
+    .change-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    .source-frame {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: inline-block;
+    }
+
+    #sourceCanvas { display: block; }
+
+    #cropBox {
+      position: absolute;
+      box-shadow: 0 0 0 2000px rgba(0,0,0,0.55);
+      border: 1.5px solid rgba(255,255,255,0.8);
+      outline: 1px solid rgba(0,0,0,0.5);
+      cursor: move;
+      user-select: none;
+      touch-action: none;
+      transition: border-color 0.1s;
+    }
+    #cropBox.snapped {
+      border-color: rgba(251,191,36,0.95);
+    }
+    #cropBox::before, #cropBox::after {
+      content: '';
+      position: absolute;
+      width: 10px; height: 10px;
+      border-color: rgba(255,255,255,0.85);
+      border-style: solid;
+    }
+    #cropBox::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    #cropBox::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    .snap-guide {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      background: var(--snap);
+      transition: opacity 0.08s;
+      z-index: 10;
+    }
+    .snap-guide.active { opacity: 1; }
+    #snapGuideH { height: 1px; left: 0; right: 0; top: 50%; margin-top: -.5px; }
+    #snapGuideV { width: 1px; top: 0; bottom: 0; left: 50%; margin-left: -.5px; }
+
+    /* ── Side panels (controls + preview) ──────────── */
+    .side-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-section:last-child { border-bottom: none; }
+
+    .panel-heading {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .panel-section { display: flex; flex-direction: column; align-items: center; }
+
+    /* ── Scale pills ────────────────────────────────── */
+    .pill-group {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .pill-group--wrap {
+      flex-wrap: wrap;
+    }
+    .pill-group--wrap .pill {
+      flex: 1 1 calc(33.333% - 4px);
+      font-size: 0.72rem;
+      padding: 5px 0;
+    }
+
+    .pill {
+      flex: 1;
+      padding: 6px 0;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: all 0.12s;
+      text-align: center;
+    }
+    .pill:hover { border-color: #444; color: var(--text); }
+    .pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #111;
+      font-weight: 600;
+    }
+
+    /* ── Position picker ────────────────────────────── */
+    #posSection { display: flex; }
+    #posSection.disabled { opacity: 0.35; pointer-events: none; }
+
+    .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 26px);
+      grid-template-rows: repeat(3, 26px);
+      gap: 3px;
+      width: fit-content;
+      margin: 0 auto;
+    }
+
+    .pos-btn {
+      width: 26px;
+      height: 26px;
+      min-width: 0;
+      padding: 0;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      border-radius: 5px;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.1s, background 0.1s;
+    }
+    .pos-btn:hover { border-color: #444; background: #1f1f25; }
+    .pos-btn::after {
+      content: '';
+      position: absolute;
+      width: 6px; height: 6px;
+      background: var(--muted);
+      border-radius: 1px;
+      transition: background 0.1s;
+    }
+
+    .pos-btn[data-pos="tl"]::after { top: 5px;  left: 5px; }
+    .pos-btn[data-pos="tc"]::after { top: 5px;  left: 50%; transform: translateX(-50%); }
+    .pos-btn[data-pos="tr"]::after { top: 5px;  right: 5px; }
+    .pos-btn[data-pos="ml"]::after { top: 50%;  left: 5px; transform: translateY(-50%); }
+    .pos-btn[data-pos="mc"]::after { top: 50%;  left: 50%; transform: translate(-50%,-50%); }
+    .pos-btn[data-pos="mr"]::after { top: 50%;  right: 5px; transform: translateY(-50%); }
+    .pos-btn[data-pos="bl"]::after { bottom: 5px; left: 5px; }
+    .pos-btn[data-pos="bc"]::after { bottom: 5px; left: 50%; transform: translateX(-50%); }
+    .pos-btn[data-pos="br"]::after { bottom: 5px; right: 5px; }
+
+    .pos-btn.active { border-color: var(--accent); background: rgba(232,232,234,0.1); }
+    .pos-btn.active::after { background: var(--accent); }
+
+    /* ── Preview ────────────────────────────────────── */
+    #previewCanvas {
+      display: block;
+      width: 100%;
+      /* height computed to maintain 480:800 = 3:5 ratio */
+      aspect-ratio: 3 / 5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      image-rendering: auto;
+      cursor: crosshair;
+    }
+
+    /* ── Zoom loupe ──────────────────────────────────── */
+    #zoomBox {
+      display: none;
+      position: fixed;
+      width: 260px;
+      height: 260px;
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #zoomCanvas { display: block; }
+    #zoomLabel {
+      position: absolute;
+      bottom: 6px;
+      right: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      color: rgba(255,255,255,0.4);
+      pointer-events: none;
+    }
+
+    /* ── Toggle switch ──────────────────────────────── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+    .toggle-label {
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+    .toggle {
+      position: relative;
+      width: 36px; height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      background: var(--border2);
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--muted);
+      top: 3px; left: 3px;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent-dim); }
+    .toggle input:checked + .toggle-track::after {
+      transform: translateX(16px);
+      background: #111;
+    }
+
+    /* ── Download button ────────────────────────────── */
+    .download-btn {
+      display: none;
+      width: 100%;
+      padding: 11px 0;
+      background: var(--accent);
+      color: #111;
+      border: none;
+      border-radius: 0 0 9px 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.12s;
+      margin-top: 10px;
+    }
+    .download-btn:hover { opacity: 0.82; }
+    .download-btn.visible { display: block; }
+
+    /* ── Footer ─────────────────────────────────────── */
+    footer {
+      margin-top: 28px;
+      font-size: 0.7rem;
+      color: var(--muted2);
+      text-align: center;
+      line-height: 2;
+    }
+    footer code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: var(--muted);
+    }
+
+    /* ── Rotation buttons ───────────────────────────── */
+    .rotate-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .rotate-btn {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1.15rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.1s, background 0.1s;
+      flex-shrink: 0;
+    }
+    .rotate-btn:hover { border-color: #444; background: #1f1f25; }
+
+    .rotate-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      min-width: 28px;
+      text-align: center;
+    }
+
+    /* ── Contrast slider ────────────────────────────── */
+    .contrast-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .contrast-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 3px;
+      border-radius: 2px;
+      background: var(--border2);
+      outline: none;
+      cursor: pointer;
+    }
+    .contrast-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: none;
+    }
+    .contrast-slider::-moz-range-thumb {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: none;
+    }
+
+    .contrast-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      min-width: 30px;
+      text-align: right;
+    }
+
+    .contrast-reset {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.65rem;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 2px 6px;
+      cursor: pointer;
+      transition: color 0.1s, border-color 0.1s;
+      white-space: nowrap;
+      margin-top: 8px;
+    }
+    .contrast-reset:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ── Responsive ─────────────────────────────────── */
+    @media (max-width: 720px) {
+      .app { grid-template-columns: 1fr 1fr; }
+      .left { grid-column: 1 / -1; }
+    }
+    @media (max-width: 480px) {
+      .app { grid-template-columns: 1fr; }
+      #previewCanvas { max-height: 260px; width: auto; margin: 0 auto; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>CrossPoint Sleep Screen Converter</h1>
+</header>
+
+<div class="app">
+
+  <!-- ── Left: drop zone + editor ─────────────────── -->
+  <div class="left">
+
+    <div class="drop-zone" id="dropZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/>
+      </svg>
+      Drop image here or click to browse
+      <small>PNG, JPG, WebP, BMP, GIF</small>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div class="editor-section" id="editorSection">
+      <div class="source-header">
+        <p class="section-label" id="sourceLabel">Source — drag to reposition</p>
+        <button class="change-btn" id="changeBtn">Clear</button>
+      </div>
+      <div class="source-frame" id="sourceFrame">
+        <canvas id="sourceCanvas"></canvas>
+        <div id="cropBox"></div>
+        <div id="snapGuideH" class="snap-guide"></div>
+        <div id="snapGuideV" class="snap-guide"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Controls panel ───────────────────────────── -->
+  <div class="side-panel">
+
+    <div class="panel-section">
+      <p class="panel-heading">Scale</p>
+      <div class="pill-group">
+        <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
+        <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <p class="panel-heading">Rotation</p>
+      <div class="rotate-group">
+        <button class="rotate-btn" id="rotateCCW" title="Rotate 90° counter-clockwise">↺</button>
+        <span class="rotate-val" id="rotateVal">0°</span>
+        <button class="rotate-btn" id="rotateCW" title="Rotate 90° clockwise">↻</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <p class="panel-heading">Dither</p>
+      <div class="pill-group pill-group--wrap">
+        <button class="pill active" data-dither="fs">Floyd-S</button>
+        <button class="pill" data-dither="atk">Atkinson</button>
+        <button class="pill" data-dither="jjn">Jarvis</button>
+        <button class="pill" data-dither="stucki">Stucki</button>
+        <button class="pill" data-dither="burkes">Burkes</button>
+        <button class="pill" data-dither="bayer">Bayer</button>
+        <button class="pill" data-dither="zhou-fang">Zhou-Fang</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <p class="panel-heading">Contrast</p>
+      <div class="contrast-row">
+        <input type="range" id="contrastSlider" class="contrast-slider" min="-100" max="100" value="0" step="1">
+        <span class="contrast-val" id="contrastVal">0</span>
+      </div>
+      <button class="contrast-reset" id="contrastReset">Reset</button>
+    </div>
+
+    <div class="panel-section">
+      <div class="toggle-row">
+        <span class="toggle-label">Invert</span>
+        <label class="toggle">
+          <input type="checkbox" id="invertToggle">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section disabled" id="posSection">
+      <p class="panel-heading">Position on screen</p>
+      <div class="pos-grid">
+        <button class="pos-btn" data-pos="tl" title="Top left"></button>
+        <button class="pos-btn" data-pos="tc" title="Top centre"></button>
+        <button class="pos-btn" data-pos="tr" title="Top right"></button>
+        <button class="pos-btn" data-pos="ml" title="Middle left"></button>
+        <button class="pos-btn active" data-pos="mc" title="Centre"></button>
+        <button class="pos-btn" data-pos="mr" title="Middle right"></button>
+        <button class="pos-btn" data-pos="bl" title="Bottom left"></button>
+        <button class="pos-btn" data-pos="bc" title="Bottom centre"></button>
+        <button class="pos-btn" data-pos="br" title="Bottom right"></button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Preview panel ─────────────────────────────── -->
+  <div class="side-panel">
+
+    <div class="panel-section" style="padding-bottom: 12px;">
+      <p class="panel-heading">Preview</p>
+      <!-- internal 480×800, CSS maintains 3:5 ratio -->
+      <canvas id="previewCanvas" width="480" height="800"></canvas>
+    </div>
+
+    <button class="download-btn" id="downloadBtn">Download .pxc</button>
+
+  </div>
+
+</div>
+
+<footer>
+  Place on SD card as <code>/sleep.pxc</code> or inside <code>/.sleep/</code>
+</footer>
+
+<canvas id="workCanvas" width="480" height="800" style="display:none"></canvas>
+<div id="zoomBox">
+  <canvas id="zoomCanvas" width="260" height="260"></canvas>
+  <span id="zoomLabel">3.5× zoom</span>
+</div>
+
+<script>
+const TARGET_W = 480;
+const TARGET_H = 800;
+const MAX_EDITOR_W = 340;
+const MAX_EDITOR_H = 520;
+const SNAP_THRESHOLD = 9;
+
+// Pre-computed sRGB → linear LUT (avoids Math.pow per pixel)
+const SRGB_TO_LINEAR = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const s = i / 255;
+  SRGB_TO_LINEAR[i] = (s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)) * 255;
+}
+
+// Gray reference values in LINEAR light — these are the linear equivalents of
+// sRGB [0, 85, 170, 255], i.e. what the display outputs in linear reflectance.
+// Error diffusion must run in linear space so errors are perceptually uniform.
+const GRAY_REF  = [0, 23, 103, 255];
+
+// Preview display values — sRGB encoded, for the monitor
+const GRAY_DISP = [0, 85, 170, 255];
+
+let loadedImg     = null;
+let rotatedSrc    = null;   // offscreen canvas holding rotated image, or null when rotation=0
+let pxcBytes      = null;
+let outputName    = 'sleep.pxc';
+let mode          = 'crop';
+let fitAlign      = 'mc';
+let contrastValue = 0;
+let invert        = false;
+let ditherMode    = 'fs';   // 'fs' = Floyd-Steinberg, 'atk' = Atkinson
+let rotation      = 0;      // 0, 90, 180, 270
+
+let displayScale = 1;
+let workScale    = 1;
+let dispImgW = 0, dispImgH = 0;
+let boxW = 0, boxH = 0, boxX = 0, boxY = 0;
+
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0, dragStartBX = 0, dragStartBY = 0;
+let snapH = false, snapV = false;
+let convertTimer = null;
+
+const dropZone      = document.getElementById('dropZone');
+const fileInput     = document.getElementById('fileInput');
+const editorSection = document.getElementById('editorSection');
+const sourceFrame   = document.getElementById('sourceFrame');
+const sourceCanvas  = document.getElementById('sourceCanvas');
+const sourceLabel   = document.getElementById('sourceLabel');
+const changeBtn     = document.getElementById('changeBtn');
+const cropBox       = document.getElementById('cropBox');
+const snapGuideH    = document.getElementById('snapGuideH');
+const snapGuideV    = document.getElementById('snapGuideV');
+const posSection      = document.getElementById('posSection');
+const contrastSlider  = document.getElementById('contrastSlider');
+const contrastValEl   = document.getElementById('contrastVal');
+const contrastReset   = document.getElementById('contrastReset');
+const rotateCWBtn     = document.getElementById('rotateCW');
+const rotateCCWBtn    = document.getElementById('rotateCCW');
+const rotateValEl     = document.getElementById('rotateVal');
+const invertToggle    = document.getElementById('invertToggle');
+const previewCanvas = document.getElementById('previewCanvas');
+const workCanvas    = document.getElementById('workCanvas');
+const downloadBtn   = document.getElementById('downloadBtn');
+
+// Invert toggle
+invertToggle.addEventListener('change', () => {
+  invert = invertToggle.checked;
+  scheduleConvert(0);
+});
+
+// Rotation
+rotateCWBtn.addEventListener('click',  () => applyRotation((rotation + 90)  % 360));
+rotateCCWBtn.addEventListener('click', () => applyRotation((rotation + 270) % 360));
+
+function applyRotation(deg) {
+  rotation = deg;
+  rotateValEl.textContent = deg + '°';
+  if (loadedImg) { buildRotatedSrc(); resetEditor(); }
+}
+
+// Build an offscreen canvas with the image rotated by `rotation` degrees.
+// Width/height swap on 90°/270° so the output always has the rotated dimensions.
+function buildRotatedSrc() {
+  const sw = loadedImg.naturalWidth, sh = loadedImg.naturalHeight;
+  const rw = (rotation % 180 === 0) ? sw : sh;
+  const rh = (rotation % 180 === 0) ? sh : sw;
+  if (!rotatedSrc) rotatedSrc = document.createElement('canvas');
+  rotatedSrc.width = rw; rotatedSrc.height = rh;
+  const tc = rotatedSrc.getContext('2d');
+  tc.clearRect(0, 0, rw, rh);
+  tc.save();
+  tc.translate(rw / 2, rh / 2);
+  tc.rotate(rotation * Math.PI / 180);
+  tc.drawImage(loadedImg, -sw / 2, -sh / 2);
+  tc.restore();
+}
+
+// Returns the effective source image/canvas after rotation.
+function getSource() { return rotation === 0 ? loadedImg : rotatedSrc; }
+function srcW(s)      { return s.naturalWidth  ?? s.width; }
+function srcH(s)      { return s.naturalHeight ?? s.height; }
+
+// Contrast slider
+contrastSlider.addEventListener('input', () => {
+  contrastValue = parseInt(contrastSlider.value);
+  contrastValEl.textContent = (contrastValue > 0 ? '+' : '') + contrastValue;
+  scheduleConvert(50);
+});
+contrastReset.addEventListener('click', () => {
+  contrastValue = 0;
+  contrastSlider.value = '0';
+  contrastValEl.textContent = '0';
+  scheduleConvert(0);
+});
+
+// Change / unload image
+changeBtn.addEventListener('click', unloadImage);
+
+function unloadImage() {
+  clearTimeout(convertTimer);
+
+  // Release decoded bitmap from browser memory
+  if (loadedImg) { loadedImg.src = ''; loadedImg = null; }
+
+  // Release dithered output buffer
+  pxcBytes = null;
+
+  // Free canvas pixel buffers by resizing to 1×1
+  sourceCanvas.width = 1; sourceCanvas.height = 1;
+  workCanvas.getContext('2d').clearRect(0, 0, TARGET_W, TARGET_H);
+  previewCanvas.getContext('2d').clearRect(0, 0, TARGET_W, TARGET_H);
+
+  // Reset file input so the same file can be re-picked
+  fileInput.value = '';
+
+  // Reset state
+  outputName = 'sleep.pxc';
+  rotation = 0; rotatedSrc = null; rotateValEl.textContent = '0°';
+  invert = false; invertToggle.checked = false;
+  contrastValue = 0;
+  contrastSlider.value = '0';
+  contrastValEl.textContent = '0';
+  clearSnap();
+
+  // Restore UI
+  dropZone.style.display = '';
+  editorSection.classList.remove('visible');
+  posSection.classList.add('disabled');
+  downloadBtn.classList.remove('visible');
+}
+
+// Mode pills (Scale)
+document.querySelectorAll('[data-mode]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    mode = btn.dataset.mode;
+    document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (loadedImg) resetEditor();
+  });
+});
+
+// Dither pills
+document.querySelectorAll('[data-dither]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    ditherMode = btn.dataset.dither;
+    document.querySelectorAll('[data-dither]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    scheduleConvert(0);
+  });
+});
+
+// Position picker
+document.querySelectorAll('.pos-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    fitAlign = btn.dataset.pos;
+    document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    scheduleConvert(0);
+  });
+});
+
+// Drop / browse
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  outputName = file.name.replace(/\.[^.]+$/, '') + '.pxc';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => { loadedImg = img; resetEditor(); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetEditor() {
+  if (rotation !== 0) buildRotatedSrc();
+  const src = getSource();
+  const sw = srcW(src), sh = srcH(src);
+
+  displayScale = Math.min(MAX_EDITOR_W / sw, MAX_EDITOR_H / sh);
+  dispImgW = Math.round(sw * displayScale);
+  dispImgH = Math.round(sh * displayScale);
+
+  workScale = mode === 'crop'
+    ? Math.max(TARGET_W / sw, TARGET_H / sh)
+    : Math.min(TARGET_W / sw, TARGET_H / sh);
+
+  boxW = Math.min((TARGET_W / workScale) * displayScale, dispImgW);
+  boxH = Math.min((TARGET_H / workScale) * displayScale, dispImgH);
+  boxX = (dispImgW - boxW) / 2;
+  boxY = (dispImgH - boxH) / 2;
+
+  sourceCanvas.width  = dispImgW;
+  sourceCanvas.height = dispImgH;
+  sourceCanvas.getContext('2d').drawImage(src, 0, 0, dispImgW, dispImgH);
+  sourceFrame.style.width  = dispImgW + 'px';
+  sourceFrame.style.height = dispImgH + 'px';
+
+  if (mode === 'crop') {
+    sourceLabel.textContent = 'Source — drag to reposition';
+    cropBox.style.display = 'block';
+    posSection.classList.add('disabled');
+    clearSnap();
+    applyCropBox();
+  } else {
+    sourceLabel.textContent = 'Source';
+    cropBox.style.display = 'none';
+    posSection.classList.remove('disabled');
+    clearSnap();
+  }
+
+  dropZone.style.display = 'none';
+  editorSection.classList.add('visible');
+  scheduleConvert(0);
+}
+
+function applyCropBox() {
+  boxX = Math.max(0, Math.min(dispImgW - boxW, boxX));
+  boxY = Math.max(0, Math.min(dispImgH - boxH, boxY));
+  cropBox.style.left   = boxX + 'px';
+  cropBox.style.top    = boxY + 'px';
+  cropBox.style.width  = boxW + 'px';
+  cropBox.style.height = boxH + 'px';
+}
+
+function clearSnap() {
+  snapH = snapV = false;
+  snapGuideH.classList.remove('active');
+  snapGuideV.classList.remove('active');
+  cropBox.classList.remove('snapped');
+}
+
+// Drag
+cropBox.addEventListener('mousedown',  onDragStart);
+cropBox.addEventListener('touchstart', onDragStart, { passive: false });
+window.addEventListener('mousemove',   onDragMove);
+window.addEventListener('touchmove',   onDragMove, { passive: false });
+window.addEventListener('mouseup',     onDragEnd);
+window.addEventListener('touchend',    onDragEnd);
+
+function clientXY(e) {
+  return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+                   : { x: e.clientX, y: e.clientY };
+}
+
+function onDragStart(e) {
+  if (mode !== 'crop') return;
+  e.preventDefault();
+  isDragging = true;
+  const p = clientXY(e);
+  dragStartX = p.x; dragStartY = p.y;
+  dragStartBX = boxX; dragStartBY = boxY;
+}
+
+function onDragMove(e) {
+  if (!isDragging) return;
+  e.preventDefault();
+  const p = clientXY(e);
+  let rawX = dragStartBX + (p.x - dragStartX);
+  let rawY = dragStartBY + (p.y - dragStartY);
+  const cx = (dispImgW - boxW) / 2, cy = (dispImgH - boxH) / 2;
+  snapH = Math.abs(rawX - cx) < SNAP_THRESHOLD;
+  snapV = Math.abs(rawY - cy) < SNAP_THRESHOLD;
+  boxX = snapH ? cx : rawX;
+  boxY = snapV ? cy : rawY;
+  applyCropBox();
+  snapGuideV.classList.toggle('active', snapH);
+  snapGuideH.classList.toggle('active', snapV);
+  cropBox.classList.toggle('snapped', snapH || snapV);
+  scheduleConvert(100);
+}
+
+function onDragEnd() {
+  if (!isDragging) return;
+  isDragging = false;
+  setTimeout(clearSnap, 600);
+  scheduleConvert(0);
+}
+
+// Conversion
+function scheduleConvert(delay) {
+  clearTimeout(convertTimer);
+  convertTimer = setTimeout(convert, delay);
+}
+
+// BT.601 luminance in LINEAR light — weights applied after sRGB linearisation
+function lum(r, g, b) {
+  return 0.299 * SRGB_TO_LINEAR[r] + 0.587 * SRGB_TO_LINEAR[g] + 0.114 * SRGB_TO_LINEAR[b];
+}
+
+// Thresholds are midpoints of GRAY_REF linear values [0, 23, 103, 255]
+function quantize(v) {
+  if (v < 12)  return 0;
+  if (v < 63)  return 1;
+  if (v < 179) return 2;
+  return 3;
+}
+
+function fitOffset(fw, fh) {
+  const pos = fitAlign;
+  const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (TARGET_W - fw) / 2 : TARGET_W - fw;
+  const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (TARGET_H - fh) / 2 : TARGET_H - fh;
+  return { x, y };
+}
+
+function convert() {
+  if (!loadedImg) return;
+  const src  = getSource();
+  const sw   = srcW(src), sh = srcH(src);
+  const ctx  = workCanvas.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+
+  if (mode === 'fit') {
+    const fs = Math.min(TARGET_W / sw, TARGET_H / sh);
+    const fw = sw * fs, fh = sh * fs;
+    const off = fitOffset(fw, fh);
+    ctx.drawImage(src, off.x, off.y, fw, fh);
+  } else {
+    const k = workScale / displayScale;
+    ctx.drawImage(src, -boxX * k, -boxY * k, sw * workScale, sh * workScale);
+  }
+
+  const px  = ctx.getImageData(0, 0, TARGET_W, TARGET_H).data;
+  const buf = new Float32Array(TARGET_W * TARGET_H);
+  for (let i = 0; i < TARGET_W * TARGET_H; i++)
+    buf[i] = lum(px[i*4], px[i*4+1], px[i*4+2]);  // linear luminance 0–255
+
+  // Contrast adjustment in linear space — pivot at midpoint 127.5
+  if (contrastValue !== 0) {
+    const factor = contrastValue >= 0 ? 1 + contrastValue * 2 / 100 : 1 + contrastValue / 100;
+    for (let i = 0; i < TARGET_W * TARGET_H; i++)
+      buf[i] = Math.max(0, Math.min(255, (buf[i] - 127.5) * factor + 127.5));
+  }
+
+  // Inversion in linear space
+  if (invert) {
+    for (let i = 0; i < TARGET_W * TARGET_H; i++)
+      buf[i] = 255 - buf[i];
+  }
+
+  // 4×4 Bayer matrix (0–15), used for ordered dithering
+  const BAYER4 = [
+    [ 0,  8,  2, 10],
+    [12,  4, 14,  6],
+    [ 3, 11,  1,  9],
+    [15,  7, 13,  5]
+  ];
+
+  const q = new Uint8Array(TARGET_W * TARGET_H);
+
+  if (ditherMode === 'bayer') {
+    // Ordered (Bayer 4×4): no error bleeding, regular pattern.
+    // Uses non-uniform thresholds matching GRAY_REF levels.
+    for (let y = 0; y < TARGET_H; y++) {
+      for (let x = 0; x < TARGET_W; x++) {
+        const i = y * TARGET_W + x;
+        const v = Math.max(0, Math.min(255, buf[i]));
+        const t = BAYER4[y & 3][x & 3] / 16;  // 0..0.9375
+        // Find the bracket this value falls in and use Bayer to round up or down
+        let lo = 0;
+        for (let k = 2; k >= 0; k--) { if (v >= GRAY_REF[k]) { lo = k; break; } }
+        const hi = Math.min(lo + 1, 3);
+        const frac = lo === hi ? 1 : (v - GRAY_REF[lo]) / (GRAY_REF[hi] - GRAY_REF[lo]);
+        q[i] = frac > t ? hi : lo;
+      }
+    }
+  } else if (ditherMode === 'zhou-fang') {
+    // Zhou-Fang: Jarvis-Judice-Ninke kernel with serpentine (bidirectional) scanning.
+    // Alternating scan direction eliminates the left-biased "worm" artifacts common
+    // in single-direction error diffusion, producing more neutral results on e-ink.
+    // Kernel (forward pass shown; current-row half mirrors on reverse pass):
+    //           X   7   5
+    //   3   5   7   5   3
+    //   1   3   5   3   1    ÷ 48
+    for (let y = 0; y < TARGET_H; y++) {
+      const ltr = (y & 1) === 0;
+      for (let xi = 0; xi < TARGET_W; xi++) {
+        const x  = ltr ? xi : TARGET_W - 1 - xi;
+        const i  = y * TARGET_W + x;
+        const v  = Math.max(0, Math.min(255, buf[i]));
+        const qv = quantize(v);
+        q[i]     = qv;
+        const e  = v - GRAY_REF[qv];
+        const W  = TARGET_W;
+        const d  = ltr ? 1 : -1;
+        const k  = e / 48;
+
+        // Current row — two neighbours in scan direction
+        if (x+d >= 0 && x+d < W)       buf[i+d]       += 7*k;
+        if (x+d*2 >= 0 && x+d*2 < W)   buf[i+d*2]     += 5*k;
+
+        // Next row — symmetric 5-wide kernel, unaffected by direction
+        if (y+1 < TARGET_H) {
+          if (x > 1)    buf[i+W-2] += 3*k;
+          if (x > 0)    buf[i+W-1] += 5*k;
+                        buf[i+W]   += 7*k;
+          if (x+1 < W)  buf[i+W+1] += 5*k;
+          if (x+2 < W)  buf[i+W+2] += 3*k;
+        }
+
+        // Row +2 — symmetric 5-wide kernel
+        if (y+2 < TARGET_H) {
+          if (x > 1)    buf[i+W*2-2] += 1*k;
+          if (x > 0)    buf[i+W*2-1] += 3*k;
+                        buf[i+W*2]   += 5*k;
+          if (x+1 < W)  buf[i+W*2+1] += 3*k;
+          if (x+2 < W)  buf[i+W*2+2] += 1*k;
+        }
+      }
+    }
+  } else {
+    // Error-diffusion family — kernel weights defined per algorithm
+    for (let y = 0; y < TARGET_H; y++) {
+      for (let x = 0; x < TARGET_W; x++) {
+        const i  = y * TARGET_W + x;
+        const v  = Math.max(0, Math.min(255, buf[i]));
+        const qv = quantize(v);
+        q[i]     = qv;
+        const e  = v - GRAY_REF[qv];
+        const W  = TARGET_W;
+
+        switch (ditherMode) {
+          case 'atk':  // Atkinson — 6/8 of error, 6 neighbours
+            { const k = e / 8;
+              if (x+1 < W)          buf[i+1]     += k;
+              if (x+2 < W)          buf[i+2]     += k;
+              if (y+1 < TARGET_H) {
+                if (x>0)            buf[i+W-1]   += k;
+                                    buf[i+W]     += k;
+                if (x+1 < W)        buf[i+W+1]   += k;
+              }
+              if (y+2 < TARGET_H)   buf[i+W*2]   += k;
+            } break;
+
+          case 'jjn':  // Jarvis-Judice-Ninke — 3 rows, 12 neighbours, /48
+            { const k = e / 48;
+              if (x+1 < W)          buf[i+1]     += 7*k;
+              if (x+2 < W)          buf[i+2]     += 5*k;
+              if (y+1 < TARGET_H) {
+                if (x>1)            buf[i+W-2]   += 3*k;
+                if (x>0)            buf[i+W-1]   += 5*k;
+                                    buf[i+W]     += 7*k;
+                if (x+1 < W)        buf[i+W+1]   += 5*k;
+                if (x+2 < W)        buf[i+W+2]   += 3*k;
+              }
+              if (y+2 < TARGET_H) {
+                if (x>1)            buf[i+W*2-2] += 1*k;
+                if (x>0)            buf[i+W*2-1] += 3*k;
+                                    buf[i+W*2]   += 5*k;
+                if (x+1 < W)        buf[i+W*2+1] += 3*k;
+                if (x+2 < W)        buf[i+W*2+2] += 1*k;
+              }
+            } break;
+
+          case 'stucki':  // Stucki — similar to JJN, /42
+            { const k = e / 42;
+              if (x+1 < W)          buf[i+1]     += 8*k;
+              if (x+2 < W)          buf[i+2]     += 4*k;
+              if (y+1 < TARGET_H) {
+                if (x>1)            buf[i+W-2]   += 2*k;
+                if (x>0)            buf[i+W-1]   += 4*k;
+                                    buf[i+W]     += 8*k;
+                if (x+1 < W)        buf[i+W+1]   += 4*k;
+                if (x+2 < W)        buf[i+W+2]   += 2*k;
+              }
+              if (y+2 < TARGET_H) {
+                if (x>1)            buf[i+W*2-2] += 1*k;
+                if (x>0)            buf[i+W*2-1] += 2*k;
+                                    buf[i+W*2]   += 4*k;
+                if (x+1 < W)        buf[i+W*2+1] += 2*k;
+                if (x+2 < W)        buf[i+W*2+2] += 1*k;
+              }
+            } break;
+
+          case 'burkes':  // Burkes — 2-row Stucki, /32
+            { const k = e / 32;
+              if (x+1 < W)          buf[i+1]     += 8*k;
+              if (x+2 < W)          buf[i+2]     += 4*k;
+              if (y+1 < TARGET_H) {
+                if (x>1)            buf[i+W-2]   += 2*k;
+                if (x>0)            buf[i+W-1]   += 4*k;
+                                    buf[i+W]     += 8*k;
+                if (x+1 < W)        buf[i+W+1]   += 4*k;
+                if (x+2 < W)        buf[i+W+2]   += 2*k;
+              }
+            } break;
+
+          default:  // Floyd-Steinberg
+            if (x+1 < W)            buf[i+1]     += e * 7/16;
+            if (y+1 < TARGET_H) {
+              if (x>0)              buf[i+W-1]   += e * 3/16;
+                                    buf[i+W]     += e * 5/16;
+              if (x+1 < W)          buf[i+W+1]   += e * 1/16;
+            }
+            break;
+        }
+      }
+    }
+  }
+
+  const pc  = previewCanvas.getContext('2d');
+  const id  = pc.createImageData(TARGET_W, TARGET_H);
+  for (let i = 0; i < TARGET_W * TARGET_H; i++) {
+    const g = GRAY_DISP[q[i]];
+    id.data[i*4] = id.data[i*4+1] = id.data[i*4+2] = g;
+    id.data[i*4+3] = 255;
+  }
+  pc.putImageData(id, 0, 0);
+
+  pxcBytes = encodePxc(q, TARGET_W, TARGET_H);
+  downloadBtn.classList.add('visible');
+}
+
+function encodePxc(q, w, h) {
+  const bpr = Math.ceil(w / 4);
+  const buf = new Uint8Array(4 + bpr * h);
+  buf[0] = w & 0xFF; buf[1] = (w >> 8) & 0xFF;
+  buf[2] = h & 0xFF; buf[3] = (h >> 8) & 0xFF;
+  for (let row = 0; row < h; row++)
+    for (let col = 0; col < w; col++) {
+      const pv = q[row * w + col] & 0x03;
+      buf[4 + row * bpr + (col >> 2)] |= pv << (6 - (col & 3) * 2);
+    }
+  return buf;
+}
+
+// Zoom loupe
+const zoomBox    = document.getElementById('zoomBox');
+const zoomCanvas = document.getElementById('zoomCanvas');
+const ZOOM_BOX   = 260;   // loupe display size in px
+const ZOOM_SRC   = 72;    // source pixels sampled → ~3.5× zoom
+
+previewCanvas.addEventListener('mouseenter', () => {
+  if (pxcBytes) zoomBox.style.display = 'block';
+});
+previewCanvas.addEventListener('mouseleave', () => {
+  zoomBox.style.display = 'none';
+});
+previewCanvas.addEventListener('mousemove', e => {
+  if (!pxcBytes) return;
+
+  const rect = previewCanvas.getBoundingClientRect();
+  const cx = Math.round((e.clientX - rect.left) / rect.width  * TARGET_W);
+  const cy = Math.round((e.clientY - rect.top)  / rect.height * TARGET_H);
+
+  const half = ZOOM_SRC / 2;
+  const sx = Math.max(0, Math.min(TARGET_W - ZOOM_SRC, cx - half));
+  const sy = Math.max(0, Math.min(TARGET_H - ZOOM_SRC, cy - half));
+
+  const zc = zoomCanvas.getContext('2d');
+  zc.imageSmoothingEnabled = false;
+  zc.drawImage(previewCanvas, sx, sy, ZOOM_SRC, ZOOM_SRC, 0, 0, ZOOM_BOX, ZOOM_BOX);
+
+  // Position to the left of cursor; flip right if near left edge
+  let bx = e.clientX - ZOOM_BOX - 20;
+  let by = e.clientY - ZOOM_BOX / 2;
+  if (bx < 8) bx = e.clientX + 20;
+  by = Math.max(8, Math.min(window.innerHeight - ZOOM_BOX - 8, by));
+
+  zoomBox.style.left = bx + 'px';
+  zoomBox.style.top  = by + 'px';
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!pxcBytes) return;
+  const url = URL.createObjectURL(new Blob([pxcBytes], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = outputName; a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
