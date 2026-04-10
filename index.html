@@ -373,24 +373,34 @@
       background: #111;
     }
 
-    /* ── Download button ────────────────────────────── */
-    .download-btn {
+    /* ── Download buttons ───────────────────────────── */
+    .download-group {
       display: none;
       width: 100%;
+      flex-direction: row;
+      border-top: 1px solid var(--border);
+      margin-top: 10px;
+      border-radius: 0 0 9px 9px;
+      overflow: hidden;
+    }
+    .download-group.visible { display: flex; }
+
+    .download-btn {
+      flex: 1;
       padding: 11px 0;
       background: var(--accent);
       color: #111;
       border: none;
-      border-radius: 0 0 9px 9px;
       font-family: 'DM Sans', sans-serif;
       font-size: 0.9rem;
       font-weight: 600;
       cursor: pointer;
       transition: opacity 0.12s;
-      margin-top: 10px;
     }
     .download-btn:hover { opacity: 0.82; }
-    .download-btn.visible { display: block; }
+    .download-btn + .download-btn {
+      border-left: 1px solid rgba(0,0,0,0.18);
+    }
 
     /* ── Footer ─────────────────────────────────────── */
     footer {
@@ -548,6 +558,14 @@
   <div class="side-panel">
 
     <div class="panel-section">
+      <p class="panel-heading">XTeink</p>
+      <div class="pill-group">
+        <button class="pill" id="x3Btn" data-xt="x3">X3</button>
+        <button class="pill active" id="x4Btn" data-xt="x4">X4</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
       <p class="panel-heading">Scale</p>
       <div class="pill-group">
         <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
@@ -618,18 +636,21 @@
 
     <div class="panel-section" style="padding-bottom: 12px;">
       <p class="panel-heading">Preview</p>
-      <!-- internal 480×800, CSS maintains 3:5 ratio -->
-      <canvas id="previewCanvas" width="480" height="800"></canvas>
+    <!-- internal dims set by XTeink selection, CSS aspect-ratio updated via JS -->
+    <canvas id="previewCanvas" width="480" height="800"></canvas>
     </div>
 
-    <button class="download-btn" id="downloadBtn">Download .pxc</button>
+    <div class="download-group" id="downloadGroup">
+      <button class="download-btn" id="downloadPxc">Download .pxc</button>
+      <button class="download-btn" id="downloadBmp">Download .bmp</button>
+    </div>
 
   </div>
 
 </div>
 
 <footer>
-  Place on SD card as <code>/sleep.pxc</code> or inside <code>/.sleep/</code>
+  Place on SD card as <code>/sleep.pxc</code> | <code>/sleep.bmp</code> or inside <code>/.sleep/</code>
 </footer>
 
 <canvas id="workCanvas" width="480" height="800" style="display:none"></canvas>
@@ -639,31 +660,22 @@
 </div>
 
 <script>
-const TARGET_W = 480;
-const TARGET_H = 800;
+let TARGET_W = 480;
+let TARGET_H = 800;
 const MAX_EDITOR_W = 340;
 const MAX_EDITOR_H = 520;
 const SNAP_THRESHOLD = 9;
 
-// Pre-computed sRGB → linear LUT (avoids Math.pow per pixel)
-const SRGB_TO_LINEAR = new Float32Array(256);
-for (let i = 0; i < 256; i++) {
-  const s = i / 255;
-  SRGB_TO_LINEAR[i] = (s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)) * 255;
-}
-
-// Gray reference values in LINEAR light — these are the linear equivalents of
-// sRGB [0, 85, 170, 255], i.e. what the display outputs in linear reflectance.
-// Error diffusion must run in linear space so errors are perceptually uniform.
-const GRAY_REF  = [0, 23, 103, 255];
-
-// Preview display values — sRGB encoded, for the monitor
+// Palette values in sRGB — the four grey levels the display supports.
+// Grayscale conversion, quantization thresholds, and error diffusion
+// all operate directly on these gamma-encoded values.
 const GRAY_DISP = [0, 85, 170, 255];
 
 let loadedImg     = null;
 let rotatedSrc    = null;   // offscreen canvas holding rotated image, or null when rotation=0
-let pxcBytes      = null;
-let outputName    = 'sleep.pxc';
+let pxcBytes      = null;   // Uint8Array — pxc file bytes
+let bmpBytes      = null;   // Uint8Array — bmp file bytes
+let outputBaseName = 'sleep';
 let mode          = 'crop';
 let fitAlign      = 'mc';
 let contrastValue = 0;
@@ -701,7 +713,9 @@ const rotateValEl     = document.getElementById('rotateVal');
 const invertToggle    = document.getElementById('invertToggle');
 const previewCanvas = document.getElementById('previewCanvas');
 const workCanvas    = document.getElementById('workCanvas');
-const downloadBtn   = document.getElementById('downloadBtn');
+const downloadGroup = document.getElementById('downloadGroup');
+const downloadPxcBtn = document.getElementById('downloadPxc');
+const downloadBmpBtn = document.getElementById('downloadBmp');
 
 // Invert toggle
 invertToggle.addEventListener('change', () => {
@@ -765,6 +779,7 @@ function unloadImage() {
 
   // Release dithered output buffer
   pxcBytes = null;
+  bmpBytes = null;
 
   // Free canvas pixel buffers by resizing to 1×1
   sourceCanvas.width = 1; sourceCanvas.height = 1;
@@ -775,7 +790,7 @@ function unloadImage() {
   fileInput.value = '';
 
   // Reset state
-  outputName = 'sleep.pxc';
+  outputBaseName = 'sleep';
   rotation = 0; rotatedSrc = null; rotateValEl.textContent = '0°';
   invert = false; invertToggle.checked = false;
   contrastValue = 0;
@@ -787,8 +802,26 @@ function unloadImage() {
   dropZone.style.display = '';
   editorSection.classList.remove('visible');
   posSection.classList.add('disabled');
-  downloadBtn.classList.remove('visible');
+  downloadGroup.classList.remove('visible');
 }
+
+// XTeink device selection
+document.querySelectorAll('[data-xt]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const xt = btn.dataset.xt;
+    document.querySelectorAll('[data-xt]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (xt === 'x3') { TARGET_W = 528; TARGET_H = 792; }
+    else             { TARGET_W = 480; TARGET_H = 800; }
+    workCanvas.width  = TARGET_W;
+    workCanvas.height = TARGET_H;
+    previewCanvas.width  = TARGET_W;
+    previewCanvas.height = TARGET_H;
+    previewCanvas.style.aspectRatio = TARGET_W + ' / ' + TARGET_H;
+    if (loadedImg) resetEditor();
+    else { downloadGroup.classList.remove('visible'); pxcBytes = null; bmpBytes = null; }
+  });
+});
 
 // Mode pills (Scale)
 document.querySelectorAll('[data-mode]').forEach(btn => {
@@ -832,7 +865,7 @@ dropZone.addEventListener('drop', e => {
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
 
 function loadFile(file) {
-  outputName = file.name.replace(/\.[^.]+$/, '') + '.pxc';
+  outputBaseName = file.name.replace(/\.[^.]+$/, '');
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
@@ -953,16 +986,16 @@ function scheduleConvert(delay) {
   convertTimer = setTimeout(convert, delay);
 }
 
-// BT.601 luminance in LINEAR light — weights applied after sRGB linearisation
+// BT.601 luma — weighted sum applied directly to gamma-encoded sRGB values, no linearisation
 function lum(r, g, b) {
-  return 0.299 * SRGB_TO_LINEAR[r] + 0.587 * SRGB_TO_LINEAR[g] + 0.114 * SRGB_TO_LINEAR[b];
+  return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-// Thresholds are midpoints of GRAY_REF linear values [0, 23, 103, 255]
+// Thresholds are sRGB midpoints between palette entries [0, 85, 170, 255].
 function quantize(v) {
-  if (v < 12)  return 0;
-  if (v < 63)  return 1;
-  if (v < 179) return 2;
+  if (v < 42)  return 0;
+  if (v < 127) return 1;
+  if (v < 212) return 2;
   return 3;
 }
 
@@ -995,7 +1028,7 @@ function convert() {
   const px  = ctx.getImageData(0, 0, TARGET_W, TARGET_H).data;
   const buf = new Float32Array(TARGET_W * TARGET_H);
   for (let i = 0; i < TARGET_W * TARGET_H; i++)
-    buf[i] = lum(px[i*4], px[i*4+1], px[i*4+2]);  // linear luminance 0–255
+    buf[i] = lum(px[i*4], px[i*4+1], px[i*4+2]);
 
   // Contrast adjustment in linear space — pivot at midpoint 127.5
   if (contrastValue !== 0) {
@@ -1004,7 +1037,7 @@ function convert() {
       buf[i] = Math.max(0, Math.min(255, (buf[i] - 127.5) * factor + 127.5));
   }
 
-  // Inversion in linear space
+  // Inversion in sRGB space
   if (invert) {
     for (let i = 0; i < TARGET_W * TARGET_H; i++)
       buf[i] = 255 - buf[i];
@@ -1022,7 +1055,7 @@ function convert() {
 
   if (ditherMode === 'bayer') {
     // Ordered (Bayer 4×4): no error bleeding, regular pattern.
-    // Uses non-uniform thresholds matching GRAY_REF levels.
+    // Uses non-uniform thresholds matching GRAY_DISP palette levels.
     for (let y = 0; y < TARGET_H; y++) {
       for (let x = 0; x < TARGET_W; x++) {
         const i = y * TARGET_W + x;
@@ -1052,7 +1085,7 @@ function convert() {
         const v  = Math.max(0, Math.min(255, buf[i]));
         const qv = quantize(v);
         q[i]     = qv;
-        const e  = v - GRAY_REF[qv];
+        const e  = v - GRAY_DISP[qv];
         const W  = TARGET_W;
         const d  = ltr ? 1 : -1;
         const k  = e / 48;
@@ -1088,7 +1121,7 @@ function convert() {
         const v  = Math.max(0, Math.min(255, buf[i]));
         const qv = quantize(v);
         q[i]     = qv;
-        const e  = v - GRAY_REF[qv];
+        const e  = v - GRAY_DISP[qv];
         const W  = TARGET_W;
 
         switch (ditherMode) {
@@ -1170,6 +1203,7 @@ function convert() {
     }
   }
 
+  // ── Render preview ──────────────────────────────────────────────────────────
   const pc  = previewCanvas.getContext('2d');
   const id  = pc.createImageData(TARGET_W, TARGET_H);
   for (let i = 0; i < TARGET_W * TARGET_H; i++) {
@@ -1180,9 +1214,11 @@ function convert() {
   pc.putImageData(id, 0, 0);
 
   pxcBytes = encodePxc(q, TARGET_W, TARGET_H);
-  downloadBtn.classList.add('visible');
+  bmpBytes = encodeBmp(q, TARGET_W, TARGET_H);
+  downloadGroup.classList.add('visible');
 }
 
+// ── PXC encoder ────────────────────────────────────────────────────────────────
 function encodePxc(q, w, h) {
   const bpr = Math.ceil(w / 4);
   const buf = new Uint8Array(4 + bpr * h);
@@ -1193,6 +1229,68 @@ function encodePxc(q, w, h) {
       const pv = q[row * w + col] & 0x03;
       buf[4 + row * bpr + (col >> 2)] |= pv << (6 - (col & 3) * 2);
     }
+  return buf;
+}
+
+// ── BMP encoder — BMP3 (BITMAPINFOHEADER), 4-bit palette, 4-color grayscale ──
+// BMP rows are stored top-down (negative biHeight); each row is padded to a 4-byte boundary.
+// A 4-bit pixel stores two palette indices per byte (high nibble = left pixel).
+function encodeBmp(q, w, h) {
+  // Row stride: (w * 4bpp + 31) / 32 * 4 bytes, padded to DWORD boundary
+  const rowStride = Math.ceil(w / 2 + 3) & ~3;  // (w nibbles + 1) / 2, DWORD-aligned
+
+  const palBytes    = 4 * 4;    // 4 colours × 4 bytes (BGRA) each
+  const headerBytes = 14 + 40;  // BITMAPFILEHEADER + BITMAPINFOHEADER
+  const pixelOffset = headerBytes + palBytes;
+  const pixelBytes  = rowStride * h;
+  const fileSize    = pixelOffset + pixelBytes;
+
+  const buf  = new Uint8Array(fileSize);
+  const view = new DataView(buf.buffer);
+
+  // ── BITMAPFILEHEADER (14 bytes) ────────────────────────────────────────────
+  buf[0] = 0x42; buf[1] = 0x4D;               // 'BM'
+  view.setUint32(2,  fileSize,   true);       // bfSize
+  view.setUint16(6,  0,          true);       // bfReserved1
+  view.setUint16(8,  0,          true);       // bfReserved2
+  view.setUint32(10, pixelOffset, true);      // bfOffBits
+
+  // ── BITMAPINFOHEADER (40 bytes) ────────────────────────────────────────────
+  view.setUint32(14, 40,  true);              // biSize
+  view.setInt32 (18, w,   true);              // biWidth
+  view.setInt32 (22, -h,  true);              // biHeight (negative = top-down)
+  view.setUint16(26, 1,   true);              // biPlanes
+  view.setUint16(28, 4,   true);              // biBitCount = 4
+  view.setUint32(30, 0,   true);              // biCompression = BI_RGB
+  view.setUint32(34, pixelBytes, true);       // biSizeImage
+  view.setInt32 (38, 3780, true);             // biXPelsPerMeter (~96 dpi)
+  view.setInt32 (42, 3780, true);             // biYPelsPerMeter
+  view.setUint32(46, 4,   true);              // biClrUsed
+  view.setUint32(50, 4,   true);              // biClrImportant
+
+  // ── Palette: 4 entries, BGRA, matching GRAY_DISP [0, 85, 170, 255] ─────────
+  // Matches palette.png: #000000 #555555 #AAAAAA #FFFFFF
+  const palOff = 54;
+  for (let ci = 0; ci < 4; ci++) {
+    const g = GRAY_DISP[ci];
+    buf[palOff + ci*4 + 0] = g;  // blue
+    buf[palOff + ci*4 + 1] = g;  // green
+    buf[palOff + ci*4 + 2] = g;  // red
+    buf[palOff + ci*4 + 3] = 0;  // reserved
+  }
+
+  // ── Pixel data: top-down (biHeight < 0), high nibble = left pixel ──────────
+  const pixOff = pixelOffset;
+  for (let row = 0; row < h; row++) {
+    const rowBase = pixOff + row * rowStride;
+    for (let col = 0; col < w; col++) {
+      const idx  = q[row * w + col] & 0x0F;
+      const bIdx = rowBase + (col >> 1);
+      if ((col & 1) === 0) buf[bIdx]  = idx << 4;  // high nibble
+      else                 buf[bIdx] |= idx;       // low nibble
+    }
+  }
+
   return buf;
 }
 
@@ -1233,12 +1331,18 @@ previewCanvas.addEventListener('mousemove', e => {
   zoomBox.style.top  = by + 'px';
 });
 
-downloadBtn.addEventListener('click', () => {
-  if (!pxcBytes) return;
-  const url = URL.createObjectURL(new Blob([pxcBytes], { type: 'application/octet-stream' }));
+function triggerDownload(bytes, filename, mime) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
   const a = document.createElement('a');
-  a.href = url; a.download = outputName; a.click();
+  a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+}
+
+downloadPxcBtn.addEventListener('click', () => {
+  if (pxcBytes) triggerDownload(pxcBytes, outputBaseName + '.pxc', 'application/octet-stream');
+});
+downloadBmpBtn.addEventListener('click', () => {
+  if (bmpBytes) triggerDownload(bmpBytes, outputBaseName + '.bmp', 'image/bmp');
 });
 </script>
 </body>
