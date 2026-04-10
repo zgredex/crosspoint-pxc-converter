@@ -341,8 +341,13 @@
       width: 100%;
     }
     .toggle-label {
-      font-size: 0.82rem;
-      color: var(--text);
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      margin-bottom: 10px;
+      text-align: center;
     }
     .toggle {
       position: relative;
@@ -372,6 +377,10 @@
       transform: translateX(16px);
       background: #111;
     }
+
+    /* ── Dither algorithm pills — dimmed when dither is off ─────────────────── */
+    #ditherAlgos { transition: opacity 0.15s; }
+    #ditherAlgos.disabled { opacity: 0.35; pointer-events: none; }
 
     /* ── Download buttons ───────────────────────────── */
     .download-group {
@@ -583,8 +592,14 @@
     </div>
 
     <div class="panel-section">
-      <p class="panel-heading">Dither</p>
-      <div class="pill-group pill-group--wrap">
+      <div class="toggle-row" style="margin-bottom: 10px;">
+        <span class="toggle-label">Dither</span>
+        <label class="toggle">
+          <input type="checkbox" id="ditherToggle" checked>
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <div id="ditherAlgos" class="pill-group pill-group--wrap">
         <button class="pill active" data-dither="fs">Floyd-S</button>
         <button class="pill" data-dither="atk">Atkinson</button>
         <button class="pill" data-dither="jjn">Jarvis</button>
@@ -636,8 +651,8 @@
 
     <div class="panel-section" style="padding-bottom: 12px;">
       <p class="panel-heading">Preview</p>
-    <!-- internal dims set by XTeink selection, CSS aspect-ratio updated via JS -->
-    <canvas id="previewCanvas" width="480" height="800"></canvas>
+      <!-- internal dims set by XTeink selection, CSS aspect-ratio updated via JS -->
+      <canvas id="previewCanvas" width="480" height="800"></canvas>
     </div>
 
     <div class="download-group" id="downloadGroup">
@@ -680,6 +695,7 @@ let mode          = 'crop';
 let fitAlign      = 'mc';
 let contrastValue = 0;
 let invert        = false;
+let ditherEnabled = true;   // when false, pixels are quantized directly with no error diffusion
 let ditherMode    = 'fs';   // 'fs' = Floyd-Steinberg, 'atk' = Atkinson
 let rotation      = 0;      // 0, 90, 180, 270
 
@@ -711,6 +727,8 @@ const rotateCWBtn     = document.getElementById('rotateCW');
 const rotateCCWBtn    = document.getElementById('rotateCCW');
 const rotateValEl     = document.getElementById('rotateVal');
 const invertToggle    = document.getElementById('invertToggle');
+const ditherToggle    = document.getElementById('ditherToggle');
+const ditherAlgos     = document.getElementById('ditherAlgos');
 const previewCanvas = document.getElementById('previewCanvas');
 const workCanvas    = document.getElementById('workCanvas');
 const downloadGroup = document.getElementById('downloadGroup');
@@ -720,6 +738,13 @@ const downloadBmpBtn = document.getElementById('downloadBmp');
 // Invert toggle
 invertToggle.addEventListener('change', () => {
   invert = invertToggle.checked;
+  scheduleConvert(0);
+});
+
+// Dither toggle
+ditherToggle.addEventListener('change', () => {
+  ditherEnabled = ditherToggle.checked;
+  ditherAlgos.classList.toggle('disabled', !ditherEnabled);
   scheduleConvert(0);
 });
 
@@ -777,7 +802,7 @@ function unloadImage() {
   // Release decoded bitmap from browser memory
   if (loadedImg) { loadedImg.src = ''; loadedImg = null; }
 
-  // Release dithered output buffer
+  // Release encoded output buffers
   pxcBytes = null;
   bmpBytes = null;
 
@@ -793,6 +818,7 @@ function unloadImage() {
   outputBaseName = 'sleep';
   rotation = 0; rotatedSrc = null; rotateValEl.textContent = '0°';
   invert = false; invertToggle.checked = false;
+  ditherEnabled = true; ditherToggle.checked = true; ditherAlgos.classList.remove('disabled');
   contrastValue = 0;
   contrastSlider.value = '0';
   contrastValEl.textContent = '0';
@@ -1043,165 +1069,173 @@ function convert() {
       buf[i] = 255 - buf[i];
   }
 
-  // 4×4 Bayer matrix (0–15), used for ordered dithering
-  const BAYER4 = [
-    [ 0,  8,  2, 10],
-    [12,  4, 14,  6],
-    [ 3, 11,  1,  9],
-    [15,  7, 13,  5]
-  ];
-
   const q = new Uint8Array(TARGET_W * TARGET_H);
 
-  if (ditherMode === 'bayer') {
-    // Ordered (Bayer 4×4): no error bleeding, regular pattern.
-    // Uses non-uniform thresholds matching GRAY_DISP palette levels.
-    for (let y = 0; y < TARGET_H; y++) {
-      for (let x = 0; x < TARGET_W; x++) {
-        const i = y * TARGET_W + x;
-        const v = Math.max(0, Math.min(255, buf[i]));
-        const t = BAYER4[y & 3][x & 3] / 16;  // 0..0.9375
-        // Find the bracket this value falls in and use Bayer to round up or down
-        let lo = 0;
-        for (let k = 2; k >= 0; k--) { if (v >= GRAY_DISP[k]) { lo = k; break; } }
-        const hi = Math.min(lo + 1, 3);
-        const frac = lo === hi ? 1 : (v - GRAY_DISP[lo]) / (GRAY_DISP[hi] - GRAY_DISP[lo]);
-        q[i] = frac > t ? hi : lo;
-      }
-    }
-  } else if (ditherMode === 'zhou-fang') {
-    // Zhou-Fang: Jarvis-Judice-Ninke kernel with serpentine (bidirectional) scanning.
-    // Alternating scan direction eliminates the left-biased "worm" artifacts common
-    // in single-direction error diffusion, producing more neutral results on e-ink.
-    // Kernel (forward pass shown; current-row half mirrors on reverse pass):
-    //           X   7   5
-    //   3   5   7   5   3
-    //   1   3   5   3   1    ÷ 48
-    for (let y = 0; y < TARGET_H; y++) {
-      const ltr = (y & 1) === 0;
-      for (let xi = 0; xi < TARGET_W; xi++) {
-        const x  = ltr ? xi : TARGET_W - 1 - xi;
-        const i  = y * TARGET_W + x;
-        const v  = Math.max(0, Math.min(255, buf[i]));
-        const qv = quantize(v);
-        q[i]     = qv;
-        const e  = v - GRAY_DISP[qv];
-        const W  = TARGET_W;
-        const d  = ltr ? 1 : -1;
-        const k  = e / 48;
-
-        // Current row — two neighbours in scan direction
-        if (x+d >= 0 && x+d < W)       buf[i+d]       += 7*k;
-        if (x+d*2 >= 0 && x+d*2 < W)   buf[i+d*2]     += 5*k;
-
-        // Next row — symmetric 5-wide kernel, unaffected by direction
-        if (y+1 < TARGET_H) {
-          if (x > 1)    buf[i+W-2] += 3*k;
-          if (x > 0)    buf[i+W-1] += 5*k;
-                        buf[i+W]   += 7*k;
-          if (x+1 < W)  buf[i+W+1] += 5*k;
-          if (x+2 < W)  buf[i+W+2] += 3*k;
-        }
-
-        // Row +2 — symmetric 5-wide kernel
-        if (y+2 < TARGET_H) {
-          if (x > 1)    buf[i+W*2-2] += 1*k;
-          if (x > 0)    buf[i+W*2-1] += 3*k;
-                        buf[i+W*2]   += 5*k;
-          if (x+1 < W)  buf[i+W*2+1] += 3*k;
-          if (x+2 < W)  buf[i+W*2+2] += 1*k;
-        }
-      }
-    }
+  if (!ditherEnabled) {
+    // No dithering — quantize each pixel directly to the nearest palette entry
+    for (let i = 0; i < TARGET_W * TARGET_H; i++)
+      q[i] = quantize(Math.max(0, Math.min(255, buf[i])));
   } else {
-    // Error-diffusion family — kernel weights defined per algorithm
-    for (let y = 0; y < TARGET_H; y++) {
-      for (let x = 0; x < TARGET_W; x++) {
-        const i  = y * TARGET_W + x;
-        const v  = Math.max(0, Math.min(255, buf[i]));
-        const qv = quantize(v);
-        q[i]     = qv;
-        const e  = v - GRAY_DISP[qv];
-        const W  = TARGET_W;
 
-        switch (ditherMode) {
-          case 'atk':  // Atkinson — 6/8 of error, 6 neighbours
-            { const k = e / 8;
-              if (x+1 < W)          buf[i+1]     += k;
-              if (x+2 < W)          buf[i+2]     += k;
+    // 4×4 Bayer matrix (0–15), used for ordered dithering
+    const BAYER4 = [
+      [ 0,  8,  2, 10],
+      [12,  4, 14,  6],
+      [ 3, 11,  1,  9],
+      [15,  7, 13,  5]
+    ];
+
+    if (ditherMode === 'bayer') {
+      // Ordered (Bayer 4×4): no error bleeding, regular pattern.
+      // Uses non-uniform thresholds matching GRAY_DISP palette levels.
+      for (let y = 0; y < TARGET_H; y++) {
+        for (let x = 0; x < TARGET_W; x++) {
+          const i = y * TARGET_W + x;
+          const v = Math.max(0, Math.min(255, buf[i]));
+          const t = BAYER4[y & 3][x & 3] / 16;  // 0..0.9375
+          // Find the bracket this value falls in and use Bayer to round up or down
+          let lo = 0;
+          for (let k = 2; k >= 0; k--) { if (v >= GRAY_DISP[k]) { lo = k; break; } }
+          const hi = Math.min(lo + 1, 3);
+          const frac = lo === hi ? 1 : (v - GRAY_DISP[lo]) / (GRAY_DISP[hi] - GRAY_DISP[lo]);
+          q[i] = frac > t ? hi : lo;
+        }
+      }
+    } else if (ditherMode === 'zhou-fang') {
+      // Zhou-Fang: Jarvis-Judice-Ninke kernel with serpentine (bidirectional) scanning.
+      // Alternating scan direction eliminates the left-biased "worm" artifacts common
+      // in single-direction error diffusion, producing more neutral results on e-ink.
+      // Kernel (forward pass shown; current-row half mirrors on reverse pass):
+      //           X   7   5
+      //   3   5   7   5   3
+      //   1   3   5   3   1    ÷ 48
+      for (let y = 0; y < TARGET_H; y++) {
+        const ltr = (y & 1) === 0;
+        for (let xi = 0; xi < TARGET_W; xi++) {
+          const x  = ltr ? xi : TARGET_W - 1 - xi;
+          const i  = y * TARGET_W + x;
+          const v  = Math.max(0, Math.min(255, buf[i]));
+          const qv = quantize(v);
+          q[i]     = qv;
+          const e  = v - GRAY_DISP[qv];
+          const W  = TARGET_W;
+          const d  = ltr ? 1 : -1;
+          const k  = e / 48;
+
+          // Current row — two neighbours in scan direction
+          if (x+d >= 0 && x+d < W)       buf[i+d]       += 7*k;
+          if (x+d*2 >= 0 && x+d*2 < W)   buf[i+d*2]     += 5*k;
+
+          // Next row — symmetric 5-wide kernel, unaffected by direction
+          if (y+1 < TARGET_H) {
+            if (x > 1)    buf[i+W-2] += 3*k;
+            if (x > 0)    buf[i+W-1] += 5*k;
+                          buf[i+W]   += 7*k;
+            if (x+1 < W)  buf[i+W+1] += 5*k;
+            if (x+2 < W)  buf[i+W+2] += 3*k;
+          }
+
+          // Row +2 — symmetric 5-wide kernel
+          if (y+2 < TARGET_H) {
+            if (x > 1)    buf[i+W*2-2] += 1*k;
+            if (x > 0)    buf[i+W*2-1] += 3*k;
+                          buf[i+W*2]   += 5*k;
+            if (x+1 < W)  buf[i+W*2+1] += 3*k;
+            if (x+2 < W)  buf[i+W*2+2] += 1*k;
+          }
+        }
+      }
+    } else {
+      // Error-diffusion family — kernel weights defined per algorithm
+      for (let y = 0; y < TARGET_H; y++) {
+        for (let x = 0; x < TARGET_W; x++) {
+          const i  = y * TARGET_W + x;
+          const v  = Math.max(0, Math.min(255, buf[i]));
+          const qv = quantize(v);
+          q[i]     = qv;
+          const e  = v - GRAY_DISP[qv];
+          const W  = TARGET_W;
+
+          switch (ditherMode) {
+            case 'atk':  // Atkinson — 6/8 of error, 6 neighbours
+              { const k = e / 8;
+                if (x+1 < W)          buf[i+1]     += k;
+                if (x+2 < W)          buf[i+2]     += k;
+                if (y+1 < TARGET_H) {
+                  if (x>0)            buf[i+W-1]   += k;
+                                      buf[i+W]     += k;
+                  if (x+1 < W)        buf[i+W+1]   += k;
+                }
+                if (y+2 < TARGET_H)   buf[i+W*2]   += k;
+              } break;
+
+            case 'jjn':  // Jarvis-Judice-Ninke — 3 rows, 12 neighbours, /48
+              { const k = e / 48;
+                if (x+1 < W)          buf[i+1]     += 7*k;
+                if (x+2 < W)          buf[i+2]     += 5*k;
+                if (y+1 < TARGET_H) {
+                  if (x>1)            buf[i+W-2]   += 3*k;
+                  if (x>0)            buf[i+W-1]   += 5*k;
+                                      buf[i+W]     += 7*k;
+                  if (x+1 < W)        buf[i+W+1]   += 5*k;
+                  if (x+2 < W)        buf[i+W+2]   += 3*k;
+                }
+                if (y+2 < TARGET_H) {
+                  if (x>1)            buf[i+W*2-2] += 1*k;
+                  if (x>0)            buf[i+W*2-1] += 3*k;
+                                      buf[i+W*2]   += 5*k;
+                  if (x+1 < W)        buf[i+W*2+1] += 3*k;
+                  if (x+2 < W)        buf[i+W*2+2] += 1*k;
+                }
+              } break;
+
+            case 'stucki':  // Stucki — similar to JJN, /42
+              { const k = e / 42;
+                if (x+1 < W)          buf[i+1]     += 8*k;
+                if (x+2 < W)          buf[i+2]     += 4*k;
+                if (y+1 < TARGET_H) {
+                  if (x>1)            buf[i+W-2]   += 2*k;
+                  if (x>0)            buf[i+W-1]   += 4*k;
+                                      buf[i+W]     += 8*k;
+                  if (x+1 < W)        buf[i+W+1]   += 4*k;
+                  if (x+2 < W)        buf[i+W+2]   += 2*k;
+                }
+                if (y+2 < TARGET_H) {
+                  if (x>1)            buf[i+W*2-2] += 1*k;
+                  if (x>0)            buf[i+W*2-1] += 2*k;
+                                      buf[i+W*2]   += 4*k;
+                  if (x+1 < W)        buf[i+W*2+1] += 2*k;
+                  if (x+2 < W)        buf[i+W*2+2] += 1*k;
+                }
+              } break;
+
+            case 'burkes':  // Burkes — 2-row Stucki, /32
+              { const k = e / 32;
+                if (x+1 < W)          buf[i+1]     += 8*k;
+                if (x+2 < W)          buf[i+2]     += 4*k;
+                if (y+1 < TARGET_H) {
+                  if (x>1)            buf[i+W-2]   += 2*k;
+                  if (x>0)            buf[i+W-1]   += 4*k;
+                                      buf[i+W]     += 8*k;
+                  if (x+1 < W)        buf[i+W+1]   += 4*k;
+                  if (x+2 < W)        buf[i+W+2]   += 2*k;
+                }
+              } break;
+
+            default:  // Floyd-Steinberg
+              if (x+1 < W)            buf[i+1]     += e * 7/16;
               if (y+1 < TARGET_H) {
-                if (x>0)            buf[i+W-1]   += k;
-                                    buf[i+W]     += k;
-                if (x+1 < W)        buf[i+W+1]   += k;
+                if (x>0)              buf[i+W-1]   += e * 3/16;
+                                      buf[i+W]     += e * 5/16;
+                if (x+1 < W)          buf[i+W+1]   += e * 1/16;
               }
-              if (y+2 < TARGET_H)   buf[i+W*2]   += k;
-            } break;
-
-          case 'jjn':  // Jarvis-Judice-Ninke — 3 rows, 12 neighbours, /48
-            { const k = e / 48;
-              if (x+1 < W)          buf[i+1]     += 7*k;
-              if (x+2 < W)          buf[i+2]     += 5*k;
-              if (y+1 < TARGET_H) {
-                if (x>1)            buf[i+W-2]   += 3*k;
-                if (x>0)            buf[i+W-1]   += 5*k;
-                                    buf[i+W]     += 7*k;
-                if (x+1 < W)        buf[i+W+1]   += 5*k;
-                if (x+2 < W)        buf[i+W+2]   += 3*k;
-              }
-              if (y+2 < TARGET_H) {
-                if (x>1)            buf[i+W*2-2] += 1*k;
-                if (x>0)            buf[i+W*2-1] += 3*k;
-                                    buf[i+W*2]   += 5*k;
-                if (x+1 < W)        buf[i+W*2+1] += 3*k;
-                if (x+2 < W)        buf[i+W*2+2] += 1*k;
-              }
-            } break;
-
-          case 'stucki':  // Stucki — similar to JJN, /42
-            { const k = e / 42;
-              if (x+1 < W)          buf[i+1]     += 8*k;
-              if (x+2 < W)          buf[i+2]     += 4*k;
-              if (y+1 < TARGET_H) {
-                if (x>1)            buf[i+W-2]   += 2*k;
-                if (x>0)            buf[i+W-1]   += 4*k;
-                                    buf[i+W]     += 8*k;
-                if (x+1 < W)        buf[i+W+1]   += 4*k;
-                if (x+2 < W)        buf[i+W+2]   += 2*k;
-              }
-              if (y+2 < TARGET_H) {
-                if (x>1)            buf[i+W*2-2] += 1*k;
-                if (x>0)            buf[i+W*2-1] += 2*k;
-                                    buf[i+W*2]   += 4*k;
-                if (x+1 < W)        buf[i+W*2+1] += 2*k;
-                if (x+2 < W)        buf[i+W*2+2] += 1*k;
-              }
-            } break;
-
-          case 'burkes':  // Burkes — 2-row Stucki, /32
-            { const k = e / 32;
-              if (x+1 < W)          buf[i+1]     += 8*k;
-              if (x+2 < W)          buf[i+2]     += 4*k;
-              if (y+1 < TARGET_H) {
-                if (x>1)            buf[i+W-2]   += 2*k;
-                if (x>0)            buf[i+W-1]   += 4*k;
-                                    buf[i+W]     += 8*k;
-                if (x+1 < W)        buf[i+W+1]   += 4*k;
-                if (x+2 < W)        buf[i+W+2]   += 2*k;
-              }
-            } break;
-
-          default:  // Floyd-Steinberg
-            if (x+1 < W)            buf[i+1]     += e * 7/16;
-            if (y+1 < TARGET_H) {
-              if (x>0)              buf[i+W-1]   += e * 3/16;
-                                    buf[i+W]     += e * 5/16;
-              if (x+1 < W)          buf[i+W+1]   += e * 1/16;
-            }
-            break;
+              break;
+          }
         }
       }
     }
-  }
+
+  } // end ditherEnabled
 
   // ── Render preview ──────────────────────────────────────────────────────────
   const pc  = previewCanvas.getContext('2d');
@@ -1236,8 +1270,8 @@ function encodePxc(q, w, h) {
 // BMP rows are stored top-down (negative biHeight); each row is padded to a 4-byte boundary.
 // A 4-bit pixel stores two palette indices per byte (high nibble = left pixel).
 function encodeBmp(q, w, h) {
-  // Row stride: (w * 4bpp + 31) / 32 * 4 bytes, padded to DWORD boundary
-  const rowStride = Math.ceil(w / 2 + 3) & ~3;  // (w nibbles + 1) / 2, DWORD-aligned
+  // Row stride: ceil(w/2) bytes for 4-bit pixels, padded to DWORD boundary
+  const rowStride = Math.ceil(w / 2 + 3) & ~3;
 
   const palBytes    = 4 * 4;    // 4 colours × 4 bytes (BGRA) each
   const headerBytes = 14 + 40;  // BITMAPFILEHEADER + BITMAPINFOHEADER
@@ -1269,7 +1303,6 @@ function encodeBmp(q, w, h) {
   view.setUint32(50, 4,   true);              // biClrImportant
 
   // ── Palette: 4 entries, BGRA, matching GRAY_DISP [0, 85, 170, 255] ─────────
-  // Matches palette.png: #000000 #555555 #AAAAAA #FFFFFF
   const palOff = 54;
   for (let ci = 0; ci < 4; ci++) {
     const g = GRAY_DISP[ci];
