@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Game Boy 2BPP → PXC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #0d0d0f;
+      --panel:     #141416;
+      --surface:   #1c1c20;
+      --border:    #25252b;
+      --border2:   #2e2e36;
+      --accent:    #e8e8ea;
+      --accent-dim:#c8c8cc;
+      --text:      #e4e4e8;
+      --muted:     #5a5a68;
+      --muted2:    #3a3a46;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 24px 56px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 900px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 1120px;
+      display: grid;
+      grid-template-columns: 1fr 200px 310px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    /* ── Left column ─────────────────────────────── */
+    .left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .drop-zone {
+      width: 100%;
+      min-height: 140px;
+      border: 1.5px dashed var(--border2);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 24px;
+    }
+    .drop-zone:hover, .drop-zone.over {
+      border-color: var(--accent);
+      background: rgba(59,130,246,0.04);
+      color: var(--text);
+    }
+    .drop-zone svg { width: 24px; height: 24px; stroke: currentColor; opacity: 0.7; }
+    .drop-zone small { font-size: 0.72rem; color: var(--muted2); margin-top: -4px; }
+    #fileInput { display: none; }
+
+    .source-section { display: none; width: 100%; }
+    .source-section.visible { display: flex; flex-direction: column; align-items: center; }
+
+    .source-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .section-label {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .change-btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.65rem;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 2px 7px;
+      cursor: pointer;
+      transition: color 0.1s, border-color 0.1s;
+      line-height: 1.6;
+    }
+    .change-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    .source-wrap {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: inline-block;
+      max-width: 100%;
+      line-height: 0;
+    }
+
+    #gbCanvas {
+      display: block;
+      image-rendering: pixelated;
+      max-width: 100%;
+    }
+
+    /* ── File info card ──────────────────────────── */
+    .file-info {
+      display: none;
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .file-info.visible { display: block; }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 2;
+    }
+    .info-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--text);
+    }
+    .warn { color: #f59e0b; }
+
+    /* ── Side panels ─────────────────────────────── */
+    .side-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .panel-section:last-child { border-bottom: none; }
+
+    .panel-heading {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      margin-bottom: 10px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .pill-group {
+      display: flex;
+      gap: 5px;
+      width: 100%;
+    }
+
+    .pill-group--wrap { flex-wrap: wrap; }
+    .pill-group--wrap .pill { flex: 0 0 calc(50% - 3px); }
+
+    .pill {
+      flex: 1;
+      padding: 5px 4px;
+      border-radius: 6px;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 500;
+      transition: all 0.12s;
+      text-align: center;
+    }
+    .pill:hover { border-color: #444; color: var(--text); }
+    .pill.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #111;
+      font-weight: 600;
+    }
+
+    /* ── Rotation ───────────────────────────────── */
+    .rotate-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+    }
+    .rotate-btn {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 1.15rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.1s, background 0.1s;
+      flex-shrink: 0;
+    }
+    .rotate-btn:hover { border-color: #444; background: #1f1f25; }
+    .rotate-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      min-width: 28px;
+      text-align: center;
+    }
+
+    /* ── Toggle ──────────────────────────────────── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+    .toggle-label { font-size: 0.82rem; color: var(--text); }
+    .toggle { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      border-radius: 10px;
+      background: var(--border2);
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--muted);
+      top: 3px; left: 3px;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .toggle input:checked + .toggle-track { background: var(--accent-dim); }
+    .toggle input:checked + .toggle-track::after { transform: translateX(16px); background: #111; }
+
+    /* ── Preview canvas ──────────────────────────── */
+    #previewCanvas {
+      display: block;
+      width: 100%;
+      aspect-ratio: 3 / 5;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      image-rendering: pixelated;
+      cursor: crosshair;
+    }
+
+    /* ── Zoom loupe ──────────────────────────────── */
+    #zoomBox {
+      display: none;
+      position: fixed;
+      width: 260px; height: 260px;
+      border: 1px solid var(--border2);
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #zoomCanvas { display: block; }
+    #zoomLabel {
+      position: absolute;
+      bottom: 6px; right: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.62rem;
+      color: rgba(255,255,255,0.4);
+      pointer-events: none;
+    }
+
+    /* ── Download buttons ────────────────────────── */
+    .download-group {
+      display: none;
+      width: 100%;
+      flex-direction: row;
+      border-top: 1px solid var(--border);
+      border-radius: 0 0 9px 9px;
+      overflow: hidden;
+    }
+    .download-group.visible { display: flex; }
+
+    .download-btn {
+      flex: 1;
+      padding: 11px 0;
+      background: var(--accent);
+      color: #111;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.12s;
+    }
+    .download-btn:hover { opacity: 0.82; }
+    .download-btn + .download-btn { border-left: 1px solid rgba(0,0,0,0.18); }
+
+    footer {
+      margin-top: 28px;
+      font-size: 0.7rem;
+      color: var(--muted2);
+      text-align: center;
+      line-height: 2;
+    }
+    footer code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 720px) {
+      .app { grid-template-columns: 1fr 1fr; }
+      .left { grid-column: 1 / -1; }
+    }
+    @media (max-width: 480px) {
+      .app { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Game Boy 2BPP → PXC</h1>
+  <p class="subtitle">Raw .2bpp tile data → CrossPoint sleep screen · native palette BMP</p>
+</header>
+
+<div class="app">
+
+  <!-- ── Left: drop + GB source viewer ─────────── -->
+  <div class="left">
+
+    <div class="drop-zone" id="dropZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12M12 16.5V3"/>
+      </svg>
+      Drop .2bpp or .txt file here or click to browse
+      <small>Raw 2BPP binary or GB Printer protocol text log</small>
+      <input type="file" id="fileInput">
+    </div>
+
+    <div class="source-section" id="sourceSection">
+      <div class="source-header">
+        <p class="section-label">Source — native palette</p>
+        <button class="change-btn" id="changeBtn">Clear</button>
+      </div>
+      <div class="source-wrap">
+        <canvas id="gbCanvas"></canvas>
+      </div>
+    </div>
+
+    <div class="file-info" id="fileInfo">
+      <div class="info-row"><span>File</span><span class="info-val" id="infoName">—</span></div>
+      <div class="info-row"><span>Size</span><span class="info-val" id="infoSize">—</span></div>
+      <div class="info-row"><span>Tiles</span><span class="info-val" id="infoTiles">—</span></div>
+      <div class="info-row"><span>Image</span><span class="info-val" id="infoDims">—</span></div>
+      <div class="info-row" id="palletRow" style="display:none"><span>Pallet</span><span class="info-val" id="infoPallet">—</span></div>
+      <div class="info-row" id="warnRow" style="display:none">
+        <span class="warn" id="warnMsg"></span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Controls ──────────────────────────────── -->
+  <div class="side-panel">
+
+    <div class="panel-section">
+      <p class="panel-heading">Scale</p>
+      <div class="pill-group">
+        <button class="pill" data-scale="1">1×</button>
+        <button class="pill" data-scale="2">2×</button>
+        <button class="pill active" data-scale="3">3×</button>
+        <button class="pill" data-scale="fit">Fit</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <p class="panel-heading">Background</p>
+      <div class="pill-group">
+        <button class="pill active" data-bg="white">White</button>
+        <button class="pill" data-bg="black">Black</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <p class="panel-heading">BMP palette</p>
+      <div class="pill-group pill-group--wrap">
+        <button class="pill active" data-palette="dmg">DMG</button>
+        <button class="pill" data-palette="pocket">Pocket</button>
+        <button class="pill" data-palette="bw">B&amp;W</button>
+        <button class="pill" data-palette="sgb">SGB</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <p class="panel-heading">Rotation</p>
+      <div class="rotate-group">
+        <button class="rotate-btn" id="rotateCCW">↺</button>
+        <span class="rotate-val" id="rotateVal">0°</span>
+        <button class="rotate-btn" id="rotateCW">↻</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="toggle-row">
+        <span class="toggle-label">Invert</span>
+        <label class="toggle">
+          <input type="checkbox" id="invertToggle">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Preview + download ─────────────────────── -->
+  <div class="side-panel">
+
+    <div class="panel-section" style="padding-bottom: 12px;">
+      <p class="panel-heading">Preview — e-ink output</p>
+      <canvas id="previewCanvas" width="480" height="800"></canvas>
+    </div>
+
+    <div class="download-group" id="downloadGroup">
+      <button class="download-btn" id="downloadPxc">Download .pxc</button>
+      <button class="download-btn" id="downloadBmp">Download .bmp</button>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>
+  Place on SD card as <code>/sleep.pxc</code> or inside <code>/.sleep/</code>
+  &nbsp;·&nbsp; <a href="index.html">← image converter</a>
+</footer>
+
+<div id="zoomBox">
+  <canvas id="zoomCanvas" width="260" height="260"></canvas>
+  <span id="zoomLabel">3.5× zoom</span>
+</div>
+
+<script>
+const TARGET_W = 480;
+const TARGET_H = 800;
+
+// GB palette definitions — [color0(lightest) … color3(darkest)], each [R, G, B]
+const PALETTES = {
+  dmg:    [[155, 188,  15], [139, 172,  15], [ 48,  98,  48], [ 15,  56,  15]],
+  pocket: [[196, 207, 161], [139, 149, 109], [ 77,  83,  60], [ 31,  31,  15]],
+  bw:     [[255, 255, 255], [170, 170, 170], [ 85,  85,  85], [  0,   0,   0]],
+  sgb:    [[247, 231, 198], [214, 142,  73], [166,  55,  37], [ 51,  30,  80]],
+};
+
+// GB color index → PXC e-ink level (0=black … 3=white)
+// GB 0 is lightest (white) → PXC 3; GB 3 is darkest (black) → PXC 0
+const GB_TO_PXC = [3, 2, 1, 0];
+
+// E-ink display gray values for PXC levels 0-3
+const GRAY_DISP = [0, 85, 170, 255];
+
+let rawBytes    = null;   // Uint8Array — raw tile bytes (from .2bpp or parsed .txt)
+let gbPixels    = null;   // Uint8Array — decoded GB color indices (0–3), row-major
+let gbW = 0, gbH = 0;
+let pxcBytes    = null;
+let bmpBytes    = null;
+let outputBase  = 'sleep';
+const tilesWide = 20;  // GB Printer always outputs 20 tiles wide (160 px)
+let scaleMode   = '3';    // '1' | '2' | '3' | 'fit'
+let bgColor     = 'white';
+let paletteKey  = 'dmg';
+let invertFlag  = false;
+let rotation    = 0;      // 0 | 90 | 180 | 270
+// GB Printer pallet register: shade[i] = (palletReg >> (i*2)) & 3
+// Maps GB color index → display shade (0=white…3=black)
+let palletShades = null;  // null = identity (no remapping)
+
+const dropZone      = document.getElementById('dropZone');
+const fileInput     = document.getElementById('fileInput');
+const sourceSection = document.getElementById('sourceSection');
+const gbCanvas      = document.getElementById('gbCanvas');
+const fileInfoEl    = document.getElementById('fileInfo');
+const previewCanvas = document.getElementById('previewCanvas');
+const downloadGroup = document.getElementById('downloadGroup');
+const changeBtn     = document.getElementById('changeBtn');
+const invertToggle  = document.getElementById('invertToggle');
+
+// ── Drop / browse ─────────────────────────────────────────────────────────
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+changeBtn.addEventListener('click', unload);
+
+function unload() {
+  rawBytes = gbPixels = pxcBytes = bmpBytes = null;
+  palletShades = null;
+  gbW = gbH = 0;
+  sourceSection.classList.remove('visible');
+  fileInfoEl.classList.remove('visible');
+  downloadGroup.classList.remove('visible');
+  dropZone.style.display = '';
+  fileInput.value = '';
+  gbCanvas.width = gbCanvas.height = 1;
+  previewCanvas.getContext('2d').clearRect(0, 0, TARGET_W, TARGET_H);
+  rotation = 0;
+  document.getElementById('rotateVal').textContent = '0°';
+}
+
+function loadFile(file) {
+  outputBase = file.name.replace(/\.[^.]+$/, '');
+  const isTxt = /\.txt$/i.test(file.name);
+  const reader = new FileReader();
+  reader.onload = e => {
+    if (isTxt) {
+      const parsed = parsePrinterTxt(e.target.result);
+      rawBytes     = parsed.bytes;
+      palletShades = parsed.palletShades;
+    } else {
+      rawBytes     = new Uint8Array(e.target.result);
+      palletShades = null;
+    }
+    dropZone.style.display = 'none';
+    fileInfoEl.classList.add('visible');
+    sourceSection.classList.add('visible');
+    decodeDraw();
+  };
+  if (isTxt) reader.readAsText(file);
+  else        reader.readAsArrayBuffer(file);
+}
+
+// Parse GB Printer protocol text log.
+// Lines starting with '{' are JSON commands; all other non-empty lines are
+// space-separated hex bytes. Returns { bytes: Uint8Array, palletShades: array|null }.
+function parsePrinterTxt(text) {
+  const lines    = text.split('\n');
+  const allBytes = [];
+  let palletShades = null;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('{')) {
+      try {
+        const cmd = JSON.parse(line);
+        if (cmd.command === 'PRNT' && cmd.pallet !== undefined) {
+          // Pallet register: bits [2i+1:2i] = shade for GB color i
+          const reg = cmd.pallet & 0xFF;
+          palletShades = [
+            (reg >> 0) & 3,
+            (reg >> 2) & 3,
+            (reg >> 4) & 3,
+            (reg >> 6) & 3,
+          ];
+        }
+      } catch (_) {}
+      continue;
+    }
+    // Hex data line
+    for (const tok of line.split(/\s+/)) {
+      if (/^[0-9A-Fa-f]{2}$/.test(tok)) allBytes.push(parseInt(tok, 16));
+    }
+  }
+  return { bytes: new Uint8Array(allBytes), palletShades };
+}
+
+// ── 2BPP decoder ─────────────────────────────────────────────────────────
+//
+// Format (huderlem.com/demos/gameboy2bpp.html):
+//   Each 8×8 tile = 16 bytes; each row = 2 bytes (lo-plane, hi-plane).
+//   For pixel at column x (0 = leftmost):
+//     lo_bit = (lo_byte >> (7 - x)) & 1
+//     hi_bit = (hi_byte >> (7 - x)) & 1
+//     color  = (hi_bit << 1) | lo_bit   → 0 (lightest) … 3 (darkest)
+//
+function decode2bpp(bytes, tw) {
+  const totalTiles = Math.floor(bytes.length / 16);
+  const th = Math.ceil(totalTiles / tw);
+  const w = tw * 8;
+  const h = th * 8;
+  const pixels = new Uint8Array(w * h);
+
+  for (let t = 0; t < totalTiles; t++) {
+    const tileOff = t * 16;
+    const tx = (t % tw) * 8;
+    const ty = Math.floor(t / tw) * 8;
+    for (let row = 0; row < 8; row++) {
+      const lo = bytes[tileOff + row * 2];
+      const hi = bytes[tileOff + row * 2 + 1];
+      for (let col = 0; col < 8; col++) {
+        const loBit = (lo >> (7 - col)) & 1;
+        const hiBit = (hi >> (7 - col)) & 1;
+        pixels[(ty + row) * w + (tx + col)] = (hiBit << 1) | loBit;
+      }
+    }
+  }
+  return { pixels, w, h };
+}
+
+function decodeDraw() {
+  if (!rawBytes || tilesWide < 1) return;
+
+  const { pixels, w, h } = decode2bpp(rawBytes, tilesWide);
+  gbPixels = pixels; gbW = w; gbH = h;
+
+  updateFileInfo();
+  drawGbSource();
+  buildOutput();
+}
+
+function updateFileInfo() {
+  if (!rawBytes) return;
+  const totalTiles = Math.floor(rawBytes.length / 16);
+  const remainder  = rawBytes.length % 16;
+  const th = tilesWide > 0 ? Math.ceil(totalTiles / tilesWide) : 0;
+
+  document.getElementById('infoName').textContent  = outputBase;
+  document.getElementById('infoSize').textContent  = formatBytes(rawBytes.length);
+  document.getElementById('infoTiles').textContent = totalTiles + ' (' + tilesWide + '×' + th + ')';
+  document.getElementById('infoDims').textContent  = (tilesWide * 8) + ' × ' + (th * 8) + ' px';
+
+  const palletRow = document.getElementById('palletRow');
+  if (palletShades) {
+    const names = ['W', 'LG', 'DG', 'B'];
+    const shadeNames = ['W', 'LG', 'DG', 'B'];
+    const reg = palletShades.reduce((acc, s, i) => acc | (s << (i * 2)), 0);
+    const mapping = palletShades.map((s, i) => names[i] + '→' + shadeNames[s]).join(' ');
+    document.getElementById('infoPallet').textContent = '0x' + reg.toString(16).toUpperCase().padStart(2,'0') + ' (' + mapping + ')';
+    palletRow.style.display = '';
+  } else {
+    palletRow.style.display = 'none';
+  }
+
+  const warnRow = document.getElementById('warnRow');
+  const warnMsg = document.getElementById('warnMsg');
+  if (remainder !== 0) {
+    warnMsg.textContent = '⚠ ' + remainder + ' trailing byte' + (remainder > 1 ? 's' : '') + ' ignored';
+    warnRow.style.display = '';
+  } else {
+    warnRow.style.display = 'none';
+  }
+}
+
+function formatBytes(n) {
+  if (n < 1024) return n + ' B';
+  return (n / 1024).toFixed(1) + ' KB';
+}
+
+// Rotate a pixel grid by 0/90/180/270 degrees clockwise.
+// Returns a new { pixels, w, h } with dimensions swapped for 90/270.
+function rotatePixels(pixels, w, h, deg) {
+  if (deg === 0) return { pixels, w, h };
+  const rw = (deg % 180 === 0) ? w : h;
+  const rh = (deg % 180 === 0) ? h : w;
+  const out = new Uint8Array(rw * rh);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let rx, ry;
+      if      (deg === 90)  { rx = h - 1 - y; ry = x; }
+      else if (deg === 180) { rx = w - 1 - x; ry = h - 1 - y; }
+      else                  { rx = y;          ry = w - 1 - x; }  // 270
+      out[ry * rw + rx] = pixels[y * w + x];
+    }
+  }
+  return { pixels: out, w: rw, h: rh };
+}
+
+// Draw decoded image at native GB resolution, scaled up for visibility
+function drawGbSource() {
+  const pal = PALETTES[paletteKey];
+  const rot = rotatePixels(gbPixels, gbW, gbH, rotation);
+  const rW  = rot.w, rH = rot.h;
+
+  // Pixel-perfect upscale: fit within ~400px wide
+  const dispScale = Math.max(1, Math.min(6, Math.floor(400 / rW)));
+  const dw = rW * dispScale;
+  const dh = rH * dispScale;
+
+  // Render at native size first
+  const tmp = document.createElement('canvas');
+  tmp.width = rW; tmp.height = rH;
+  const tc = tmp.getContext('2d');
+  const id = tc.createImageData(rW, rH);
+  for (let i = 0; i < rW * rH; i++) {
+    let c = rot.pixels[i];
+    if (palletShades) c = palletShades[c];
+    if (invertFlag)   c = 3 - c;
+    id.data[i*4]   = pal[c][0];
+    id.data[i*4+1] = pal[c][1];
+    id.data[i*4+2] = pal[c][2];
+    id.data[i*4+3] = 255;
+  }
+  tc.putImageData(id, 0, 0);
+
+  // Scale up with nearest-neighbor
+  gbCanvas.width  = dw;
+  gbCanvas.height = dh;
+  const gc = gbCanvas.getContext('2d');
+  gc.imageSmoothingEnabled = false;
+  gc.drawImage(tmp, 0, 0, dw, dh);
+}
+
+// Build the PXC-ready pixel array and render preview
+function buildOutput() {
+  if (!gbPixels) return;
+
+  const rot = rotatePixels(gbPixels, gbW, gbH, rotation);
+  const rW = rot.w, rH = rot.h;
+
+  // Compute output placement
+  let sw, sh;
+  if (scaleMode === 'fit') {
+    const s = Math.min(TARGET_W / rW, TARGET_H / rH);
+    sw = Math.round(rW * s);
+    sh = Math.round(rH * s);
+  } else {
+    const s = parseInt(scaleMode, 10);
+    sw = rW * s;
+    sh = rH * s;
+  }
+  // Clamp to canvas
+  sw = Math.min(sw, TARGET_W);
+  sh = Math.min(sh, TARGET_H);
+
+  const ox = Math.round((TARGET_W - sw) / 2);
+  const oy = Math.round((TARGET_H - sh) / 2);
+
+  const bgPxc = bgColor === 'black' ? 0 : 3;
+  const q = new Uint8Array(TARGET_W * TARGET_H).fill(bgPxc);
+
+  for (let y = 0; y < sh; y++) {
+    const srcY = Math.min(rH - 1, Math.floor(y * rH / sh));
+    for (let x = 0; x < sw; x++) {
+      const srcX = Math.min(rW - 1, Math.floor(x * rW / sw));
+      let c = rot.pixels[srcY * rW + srcX];
+      if (palletShades) c = palletShades[c];
+      if (invertFlag)   c = 3 - c;
+      q[(oy + y) * TARGET_W + (ox + x)] = GB_TO_PXC[c];
+    }
+  }
+
+  // Render e-ink preview
+  const pc = previewCanvas.getContext('2d');
+  const id = pc.createImageData(TARGET_W, TARGET_H);
+  for (let i = 0; i < TARGET_W * TARGET_H; i++) {
+    const g = GRAY_DISP[q[i]];
+    id.data[i*4] = id.data[i*4+1] = id.data[i*4+2] = g;
+    id.data[i*4+3] = 255;
+  }
+  pc.putImageData(id, 0, 0);
+
+  pxcBytes = encodePxc(q, TARGET_W, TARGET_H);
+  bmpBytes = encodeNativeBmp(q, ox, oy, sw, sh);
+  downloadGroup.classList.add('visible');
+}
+
+// ── PXC encoder ──────────────────────────────────────────────────────────
+// Layout: uint16 LE width, uint16 LE height, pixel data 2bpp MSB-first row-major.
+// Each byte holds 4 pixels: [p0 p1 p2 p3] in bits [7:6 5:4 3:2 1:0].
+function encodePxc(q, w, h) {
+  const bpr = Math.ceil(w / 4);
+  const buf = new Uint8Array(4 + bpr * h);
+  buf[0] = w & 0xFF; buf[1] = (w >> 8) & 0xFF;
+  buf[2] = h & 0xFF; buf[3] = (h >> 8) & 0xFF;
+  for (let row = 0; row < h; row++) {
+    for (let col = 0; col < w; col++) {
+      buf[4 + row * bpr + (col >> 2)] |= (q[row * w + col] & 0x03) << (6 - (col & 3) * 2);
+    }
+  }
+  return buf;
+}
+
+// ── Native palette BMP encoder ───────────────────────────────────────────
+// BMP3, 4-bit indexed, top-down (biHeight < 0), rows DWORD-aligned.
+// Palette indices 0–3 map to GB colors 0–3 (lightest to darkest) using the
+// selected GB palette (DMG green, Pocket grey, etc.).
+// Pixel indices are derived from q (PXC levels): gbColor = 3 − pxcLevel.
+function encodeNativeBmp(q, ox, oy, sw, sh) {
+  const pal = PALETTES[paletteKey];
+  const cw = TARGET_W, ch = TARGET_H;
+  const rowStride  = Math.ceil(cw / 2 + 3) & ~3;  // DWORD-aligned 4-bit rows
+  const palBytes   = 4 * 4;
+  const hdrBytes   = 14 + 40;
+  const pixOff     = hdrBytes + palBytes;
+  const pixBytes   = rowStride * ch;
+  const fileSize   = pixOff + pixBytes;
+
+  const buf  = new Uint8Array(fileSize);
+  const view = new DataView(buf.buffer);
+
+  // BITMAPFILEHEADER (14 bytes)
+  buf[0] = 0x42; buf[1] = 0x4D;
+  view.setUint32(2,  fileSize, true);
+  view.setUint16(6,  0,        true);
+  view.setUint16(8,  0,        true);
+  view.setUint32(10, pixOff,   true);
+
+  // BITMAPINFOHEADER (40 bytes)
+  view.setUint32(14, 40,       true);
+  view.setInt32 (18, cw,       true);
+  view.setInt32 (22, -ch,      true);  // negative → top-down storage
+  view.setUint16(26, 1,        true);
+  view.setUint16(28, 4,        true);  // 4 bits per pixel
+  view.setUint32(30, 0,        true);  // BI_RGB
+  view.setUint32(34, pixBytes, true);
+  view.setInt32 (38, 3780,     true);
+  view.setInt32 (42, 3780,     true);
+  view.setUint32(46, 4,        true);
+  view.setUint32(50, 4,        true);
+
+  // Palette: entry i = GB color i, stored BGRA
+  for (let ci = 0; ci < 4; ci++) {
+    buf[54 + ci*4 + 0] = pal[ci][2];  // blue
+    buf[54 + ci*4 + 1] = pal[ci][1];  // green
+    buf[54 + ci*4 + 2] = pal[ci][0];  // red
+    buf[54 + ci*4 + 3] = 0;
+  }
+
+  // Pixel data: map each q value (PXC 0–3) back to GB color index (3 − pxcLevel)
+  for (let row = 0; row < ch; row++) {
+    const rowBase = pixOff + row * rowStride;
+    for (let col = 0; col < cw; col++) {
+      const gbColor = 3 - q[row * cw + col];  // PXC 3(white)→GB 0, PXC 0(black)→GB 3
+      const bIdx    = rowBase + (col >> 1);
+      if ((col & 1) === 0) buf[bIdx]  = gbColor << 4;  // high nibble
+      else                 buf[bIdx] |= gbColor;         // low nibble
+    }
+  }
+
+  return buf;
+}
+
+// ── Rotation buttons ───────────────────────────────────────────────────────
+
+document.getElementById('rotateCW').addEventListener('click', () => {
+  rotation = (rotation + 90) % 360;
+  document.getElementById('rotateVal').textContent = rotation + '°';
+  if (gbPixels) { drawGbSource(); buildOutput(); }
+});
+document.getElementById('rotateCCW').addEventListener('click', () => {
+  rotation = (rotation + 270) % 360;
+  document.getElementById('rotateVal').textContent = rotation + '°';
+  if (gbPixels) { drawGbSource(); buildOutput(); }
+});
+
+// ── Pill / control event handlers ─────────────────────────────────────────
+
+document.querySelectorAll('[data-scale]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    scaleMode = btn.dataset.scale;
+    document.querySelectorAll('[data-scale]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (gbPixels) buildOutput();
+  });
+});
+
+document.querySelectorAll('[data-bg]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    bgColor = btn.dataset.bg;
+    document.querySelectorAll('[data-bg]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (gbPixels) buildOutput();
+  });
+});
+
+document.querySelectorAll('[data-palette]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    paletteKey = btn.dataset.palette;
+    document.querySelectorAll('[data-palette]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (gbPixels) { drawGbSource(); buildOutput(); }
+  });
+});
+
+invertToggle.addEventListener('change', () => {
+  invertFlag = invertToggle.checked;
+  if (gbPixels) { drawGbSource(); buildOutput(); }
+});
+
+// ── Zoom loupe ─────────────────────────────────────────────────────────────
+
+const zoomBox    = document.getElementById('zoomBox');
+const zoomCanvas = document.getElementById('zoomCanvas');
+const ZOOM_BOX   = 260;
+const ZOOM_SRC   = 72;
+
+previewCanvas.addEventListener('mouseenter', () => { if (pxcBytes) zoomBox.style.display = 'block'; });
+previewCanvas.addEventListener('mouseleave', () => { zoomBox.style.display = 'none'; });
+previewCanvas.addEventListener('mousemove', e => {
+  if (!pxcBytes) return;
+  const rect = previewCanvas.getBoundingClientRect();
+  const cx   = Math.round((e.clientX - rect.left) / rect.width  * TARGET_W);
+  const cy   = Math.round((e.clientY - rect.top)  / rect.height * TARGET_H);
+  const sx   = Math.max(0, Math.min(TARGET_W - ZOOM_SRC, cx - ZOOM_SRC / 2));
+  const sy   = Math.max(0, Math.min(TARGET_H - ZOOM_SRC, cy - ZOOM_SRC / 2));
+  const zc   = zoomCanvas.getContext('2d');
+  zc.imageSmoothingEnabled = false;
+  zc.drawImage(previewCanvas, sx, sy, ZOOM_SRC, ZOOM_SRC, 0, 0, ZOOM_BOX, ZOOM_BOX);
+  let bx = e.clientX - ZOOM_BOX - 20;
+  let by = e.clientY - ZOOM_BOX / 2;
+  if (bx < 8) bx = e.clientX + 20;
+  by = Math.max(8, Math.min(window.innerHeight - ZOOM_BOX - 8, by));
+  zoomBox.style.left = bx + 'px';
+  zoomBox.style.top  = by + 'px';
+});
+
+// ── Downloads ──────────────────────────────────────────────────────────────
+
+function triggerDownload(bytes, filename, mime) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  const a   = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('downloadPxc').addEventListener('click', () => {
+  if (pxcBytes) triggerDownload(pxcBytes, outputBase + '.pxc', 'application/octet-stream');
+});
+document.getElementById('downloadBmp').addEventListener('click', () => {
+  if (bmpBytes) triggerDownload(bmpBytes, outputBase + '.bmp', 'image/bmp');
+});
+</script>
+</body>
+</html>
