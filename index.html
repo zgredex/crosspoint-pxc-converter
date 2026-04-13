@@ -492,6 +492,7 @@
 
     .contrast-slider {
       flex: 1;
+      min-width: 0;
       -webkit-appearance: none;
       appearance: none;
       height: 3px;
@@ -548,6 +549,8 @@
     .settings-col {
       display: flex;
       flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
     }
     .settings-col + .settings-col {
       border-left: 1px solid var(--border);
@@ -557,6 +560,10 @@
     @media (max-width: 860px) {
       .app { grid-template-columns: 1fr 1fr; }
       .left { grid-column: 1 / -1; }
+    }
+    @media (max-width: 600px) {
+      .settings-cols { grid-template-columns: 1fr; }
+      .settings-col + .settings-col { border-left: none; border-top: 1px solid var(--border); }
     }
     @media (max-width: 480px) {
       .app { grid-template-columns: 1fr; }
