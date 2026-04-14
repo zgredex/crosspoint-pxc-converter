@@ -1256,11 +1256,12 @@ function autoGamma() {
     cumul += preGammaHistogram[i];
     if (cumul >= half) { median = i; break; }
   }
-  if (median <= 0 || median >= 127) return;
-  // Map median to 127 — the centre of the dark-grey/light-grey boundary,
-  // which aligns with the e-ink palette quantisation midpoint (85…170 zone).
-  // Only lift (gamma ≥ 1) to avoid crushing blacks.
-  gammaValue = Math.log(median / 255) / Math.log(127 / 255);
+  if (median <= 0 || median >= 100) return;
+  // Map median to 100 — conservative target between dark-grey (85) and the
+  // quantisation midpoint (127). Lifts genuinely dark images without
+  // over-brightening ones that are already in a reasonable range.
+  // Only applies when median < 100; gamma is always ≥ 1 (never crushes blacks).
+  gammaValue = Math.log(median / 255) / Math.log(100 / 255);
   gammaValue = Math.max(1.0, Math.min(3.0, gammaValue));
   gammaSlider.value = Math.round(gammaValue * 100);
   gammaValEl.textContent = gammaValue.toFixed(2);
