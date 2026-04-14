@@ -1738,19 +1738,27 @@ function drawHistogram() {
     hc.fillRect(x1, 0, x2 - x1, BAR_H + STRIP_H + PCT_H);
   }
 
-  // Normalise bars
-  let maxVal = 0;
-  for (let i = 0; i < 256; i++) if (lastHistogram[i] > maxVal) maxVal = lastHistogram[i];
+  // Build binned histogram: 32 bins of 8 values each → ~10px wide bars
+  const BIN_W    = 8;
+  const NUM_BINS = 256 / BIN_W;
+  const binned   = new Float32Array(NUM_BINS);
+  let binnedMax  = 0;
+  for (let b = 0; b < NUM_BINS; b++) {
+    let sum = 0;
+    for (let i = 0; i < BIN_W; i++) sum += lastHistogram[b * BIN_W + i];
+    binned[b] = sum;
+    if (sum > binnedMax) binnedMax = sum;
+  }
 
-  // Bars — brightness-tinted dark→light
-  if (maxVal > 0) {
-    const barW = cw / 256;
-    for (let i = 0; i < 256; i++) {
-      if (!lastHistogram[i]) continue;
-      const barH = (lastHistogram[i] / maxVal) * BAR_H;
-      const g = Math.round(50 + (i / 255) * 160);
+  // Draw binned bars — brightness-tinted dark→light
+  if (binnedMax > 0) {
+    const barW = cw / NUM_BINS;
+    for (let b = 0; b < NUM_BINS; b++) {
+      if (!binned[b]) continue;
+      const barH = (binned[b] / binnedMax) * BAR_H;
+      const g = Math.round(50 + (b * BIN_W + BIN_W / 2) / 255 * 160);
       hc.fillStyle = `rgb(${g},${g},${g})`;
-      hc.fillRect(i * barW, BAR_H - barH, Math.max(1, barW - 0.3), barH);
+      hc.fillRect(b * barW, BAR_H - barH, Math.max(1, barW - 0.5), barH);
     }
   }
 
@@ -1769,6 +1777,13 @@ function drawHistogram() {
     const x = (t / 255) * cw;
     hc.beginPath(); hc.moveTo(x, 0); hc.lineTo(x, BAR_H + STRIP_H + PCT_H); hc.stroke();
   }
+
+  // Peak amplitude label — top-right corner
+  hc.font = `${Math.round(9 * dpr)}px monospace`;
+  hc.textBaseline = 'top';
+  hc.textAlign = 'right';
+  hc.fillStyle = 'rgba(90,90,104,0.8)';
+  hc.fillText('max ' + formatHistCount(binnedMax), cw - 4, 4);
 
   // Percentage labels — centered in each zone
   hc.font = `${Math.round(9 * dpr)}px monospace`;
@@ -2216,6 +2231,12 @@ function updateGbFileInfo() {
 function formatBytes(n) {
   if (n < 1024) return n + ' B';
   return (n / 1024).toFixed(1) + ' KB';
+}
+
+function formatHistCount(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000)    return (n / 1000).toFixed(1) + 'K';
+  return String(n);
 }
 
 function drawGbSource() {
