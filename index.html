@@ -1486,10 +1486,15 @@ function resetEditor() {
     ? Math.max(TARGET_W / sw, TARGET_H / sh)
     : Math.min(TARGET_W / sw, TARGET_H / sh);
 
+  // Preserve the crop centre in source-image coordinates across device switches.
+  // On first load (boxW === 0) just centre; otherwise anchor to the same content.
+  const prevCX = boxW > 0 ? (boxX + boxW / 2) / displayScale : sw / 2;
+  const prevCY = boxH > 0 ? (boxY + boxH / 2) / displayScale : sh / 2;
+
   boxW = Math.min((TARGET_W / workScale) * displayScale, dispImgW);
   boxH = Math.min((TARGET_H / workScale) * displayScale, dispImgH);
-  boxX = (dispImgW - boxW) / 2;
-  boxY = (dispImgH - boxH) / 2;
+  boxX = prevCX * displayScale - boxW / 2;
+  boxY = prevCY * displayScale - boxH / 2;
 
   sourceCanvas.width  = dispImgW;
   sourceCanvas.height = dispImgH;
@@ -1632,14 +1637,26 @@ function autoLevels() {
   const src = getSource();
   const sw = srcW(src), sh = srcH(src);
 
+  // Render the same crop/fit region that convert() would process —
+  // not the full source — so Auto responds to what is actually visible.
   const tmp = document.createElement('canvas');
-  tmp.width = sw; tmp.height = sh;
+  tmp.width = TARGET_W; tmp.height = TARGET_H;
   const tc = tmp.getContext('2d');
-  tc.drawImage(src, 0, 0, sw, sh);
+  tc.fillStyle = fitBg === 'black' ? '#000000' : '#ffffff';
+  tc.fillRect(0, 0, TARGET_W, TARGET_H);
+  if (mode === 'fit') {
+    const fs = Math.min(TARGET_W / sw, TARGET_H / sh);
+    const fw = sw * fs, fh = sh * fs;
+    const off = fitOffset(fw, fh);
+    tc.drawImage(src, off.x, off.y, fw, fh);
+  } else {
+    const k = workScale / displayScale;
+    tc.drawImage(src, -boxX * k, -boxY * k, sw * workScale, sh * workScale);
+  }
 
-  const px = tc.getImageData(0, 0, sw, sh).data;
+  const px = tc.getImageData(0, 0, TARGET_W, TARGET_H).data;
   const hist = new Uint32Array(256);
-  for (let i = 0; i < sw * sh; i++)
+  for (let i = 0; i < TARGET_W * TARGET_H; i++)
     hist[Math.round(lum(px[i*4], px[i*4+1], px[i*4+2]))]++;
 
   const clip = Math.max(1, Math.round(sw * sh * 0.005));
