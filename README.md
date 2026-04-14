@@ -57,15 +57,29 @@ CrossPoint picks from `/.sleep/` at random if multiple files are present.
 - **X4** — 480×800
 - **X3** — 528×792
 
-### Image adjustment
-- **Crop mode** — drag to reposition the crop window over the source image; snap guides appear when the image edge aligns with the crop boundary
-- **Fit mode** — letterbox with configurable alignment (top / center / bottom × left / center / right)
+### Image input
+- Drag and drop, click to browse, or **paste from clipboard** (Ctrl+V / Cmd+V)
+
+### Source editor
+- **Crop mode** — drag or click to reposition the crop window; snap guides appear when aligned to centre
+- **Fit mode** — letterbox with configurable alignment (3×3 grid) and background colour (black or white)
 - **Rotation** — 90° CW / CCW steps
-- **Contrast** — linear-space contrast adjustment with a ±100 slider, pivot at midpoint
-- **Invert** — invert luminance before dithering
+- **Mirror** — flip horizontal or vertical
+- **Zoom controls** — 0.5×, 0.75×, 1×, 1.5×, 2×, 3×, 4× zoom for precise crop positioning on high-res images
+- Scrollable/pannable source view — navigate large images without scaling them down
+
+### Tone pipeline
+Controls are arranged in processing order:
+
+| Control | Description |
+|---------|-------------|
+| **Tone Range** | Black point and white point sliders remap the input luminance range. **Auto** button sets them automatically via histogram percentile clipping. |
+| **Contrast** | ±100 linear contrast adjustment, pivot at midpoint. |
+| **Invert** | Invert luminance before dithering. |
+| **Dither** | Toggle + algorithm selector (see below). |
 
 ### Dithering
-Dithering can be toggled on or off. When on, the active algorithm is applied. All error-diffusion algorithms use BT.601 luminance in sRGB space and quantise against sRGB palette values `[0, 85, 170, 255]`, matching ImageMagick's `-colorspace Gray` pipeline.
+All error-diffusion algorithms use BT.601 luminance in sRGB space and quantise against sRGB palette values `[0, 85, 170, 255]`, matching ImageMagick's `-colorspace Gray` pipeline.
 
 | Algorithm | Notes |
 |-----------|-------|
@@ -76,6 +90,13 @@ Dithering can be toggled on or off. When on, the active algorithm is applied. Al
 | **Burkes** | 2-row version of Stucki (`÷ 32`). Faster and still sharp. |
 | **Bayer** | 4×4 ordered (threshold) dithering. No error bleeding, produces a regular crosshatch pattern. Good for flat illustrations with hard edges. |
 | **Zhou-Fang** | JJN kernel with **serpentine scanning** — rows alternate left→right and right→left. Eliminates the directional "worm" artifacts that single-direction JJN produces. Generally the best choice for photographic content on e-ink. |
+
+### Histogram
+Live tone distribution panel showing:
+- 256-bin luminance histogram of the processed image (after tone mapping, contrast, and invert — before dithering)
+- Four coloured zones corresponding to the display's four grey levels, each showing the percentage of pixels mapping to that output level
+- Solid palette colour strip (black / dark grey / light grey / white) for unambiguous zone identification
+- Threshold markers at 42, 127, 212
 
 ### Preview
 - Live preview updates on every change
