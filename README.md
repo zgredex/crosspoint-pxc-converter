@@ -48,9 +48,10 @@ The BMP export uses BMP3 (BITMAPINFOHEADER), 4-bit indexed colour.
 |--------------------|-----------------------------------------|
 | `/sleep.pxc`       | Single static sleep screen (PXC)        |
 | `/sleep.bmp`       | Single static sleep screen (BMP)        |
-| `/.sleep/name.pxc` | Rotated wallpaper pool (multiple files) |
+| `/.sleep/name.pxc` | Rotated wallpaper pool (PXC)            |
+| `/.sleep/name.bmp` | Rotated wallpaper pool (BMP)            |
 
-CrossPoint picks from `/.sleep/` at random if multiple files are present.
+CrossPoint picks from `/.sleep/` at random if multiple files are present. PXC and BMP files can be mixed in the same pool.
 
 ---
 
