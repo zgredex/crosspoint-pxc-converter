@@ -1667,7 +1667,7 @@ function autoLevels() {
   for (let i = 0; i < targetW * targetH; i++)
     hist[Math.round(lum(px[i*4], px[i*4+1], px[i*4+2]))]++;
 
-  const clip = Math.max(1, Math.round(sw * sh * 0.005));
+  const clip = Math.max(1, Math.round(totalPixels * 0.005));
   let lo = 0, loCount = 0;
   while (lo < 255 && (loCount += hist[lo]) < clip) lo++;
   let hi = 255, hiCount = 0;
