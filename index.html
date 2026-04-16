@@ -1003,8 +1003,15 @@
 </div>
 
 <script>
-let TARGET_W = 480;
-let TARGET_H = 800;
+const DEVICES = {
+  x3: { w: 528, h: 792 },
+  x4: { w: 480, h: 800 },
+};
+const DEFAULT_XT = 'x4';
+let targetW = DEVICES[DEFAULT_XT].w;
+let targetH = DEVICES[DEFAULT_XT].h;
+let totalPixels = targetW * targetH;
+
 const MAX_EDITOR_W = 340;
 const MAX_EDITOR_H = 520;
 const SNAP_THRESHOLD = 9;
@@ -1295,8 +1302,8 @@ function unloadImage() {
 
   // Free canvas pixel buffers by resizing to 1×1
   sourceCanvas.width = 1; sourceCanvas.height = 1;
-  workCanvas.getContext('2d').clearRect(0, 0, TARGET_W, TARGET_H);
-  previewCanvas.getContext('2d').clearRect(0, 0, TARGET_W, TARGET_H);
+  workCanvas.getContext('2d').clearRect(0, 0, targetW, targetH);
+  previewCanvas.getContext('2d').clearRect(0, 0, targetW, targetH);
 
   // Reset file input so the same file can be re-picked
   fileInput.value = '';
@@ -1354,7 +1361,7 @@ function unloadGb() {
   document.getElementById('gbScaleVal').textContent = '1×';
   loadedType = null;
   hideGbUI();
-  previewCanvas.getContext('2d').clearRect(0, 0, TARGET_W, TARGET_H);
+  previewCanvas.getContext('2d').clearRect(0, 0, targetW, targetH);
   downloadGroup.classList.remove('visible');
   fileInput.value = '';
   pxcBytes = null;
@@ -1368,13 +1375,14 @@ document.querySelectorAll('[data-xt]').forEach(btn => {
     const xt = btn.dataset.xt;
     document.querySelectorAll('[data-xt]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    if (xt === 'x3') { TARGET_W = 528; TARGET_H = 792; }
-    else             { TARGET_W = 480; TARGET_H = 800; }
-    workCanvas.width  = TARGET_W;
-    workCanvas.height = TARGET_H;
-    previewCanvas.width  = TARGET_W;
-    previewCanvas.height = TARGET_H;
-    previewCanvas.style.aspectRatio = TARGET_W + ' / ' + TARGET_H;
+    const device = DEVICES[xt];
+    targetW = device.w; targetH = device.h;
+    totalPixels = targetW * targetH;
+    workCanvas.width  = targetW;
+    workCanvas.height = targetH;
+    previewCanvas.width  = targetW;
+    previewCanvas.height = targetH;
+    previewCanvas.style.aspectRatio = targetW + ' / ' + targetH;
     if (loadedImg) resetEditor();
     else if (loadedType === 'gb') buildGbOutput();
     else { downloadGroup.classList.remove('visible'); pxcBytes = null; bmpBytes = null; }
@@ -1483,16 +1491,16 @@ function resetEditor() {
   dispImgH = Math.round(sh * displayScale);
 
   workScale = mode === 'crop'
-    ? Math.max(TARGET_W / sw, TARGET_H / sh)
-    : Math.min(TARGET_W / sw, TARGET_H / sh);
+    ? Math.max(targetW / sw, targetH / sh)
+    : Math.min(targetW / sw, targetH / sh);
 
   // Preserve the crop centre in source-image coordinates across device switches.
   // On first load (boxW === 0) just centre; otherwise anchor to the same content.
   const prevCX = boxW > 0 ? (boxX + boxW / 2) / displayScale : sw / 2;
   const prevCY = boxH > 0 ? (boxY + boxH / 2) / displayScale : sh / 2;
 
-  boxW = Math.min((TARGET_W / workScale) * displayScale, dispImgW);
-  boxH = Math.min((TARGET_H / workScale) * displayScale, dispImgH);
+  boxW = Math.min((targetW / workScale) * displayScale, dispImgW);
+  boxH = Math.min((targetH / workScale) * displayScale, dispImgH);
   boxX = prevCX * displayScale - boxW / 2;
   boxY = prevCY * displayScale - boxH / 2;
 
@@ -1640,12 +1648,12 @@ function autoLevels() {
   // Render the same crop/fit region that convert() would process —
   // not the full source — so Auto responds to what is actually visible.
   const tmp = document.createElement('canvas');
-  tmp.width = TARGET_W; tmp.height = TARGET_H;
+  tmp.width = targetW; tmp.height = targetH;
   const tc = tmp.getContext('2d');
   tc.fillStyle = fitBg === 'black' ? '#000000' : '#ffffff';
-  tc.fillRect(0, 0, TARGET_W, TARGET_H);
+  tc.fillRect(0, 0, targetW, targetH);
   if (mode === 'fit') {
-    const fs = Math.min(TARGET_W / sw, TARGET_H / sh);
+    const fs = Math.min(targetW / sw, targetH / sh);
     const fw = sw * fs, fh = sh * fs;
     const off = fitOffset(fw, fh);
     tc.drawImage(src, off.x, off.y, fw, fh);
@@ -1654,9 +1662,9 @@ function autoLevels() {
     tc.drawImage(src, -boxX * k, -boxY * k, sw * workScale, sh * workScale);
   }
 
-  const px = tc.getImageData(0, 0, TARGET_W, TARGET_H).data;
+  const px = tc.getImageData(0, 0, targetW, targetH).data;
   const hist = new Uint32Array(256);
-  for (let i = 0; i < TARGET_W * TARGET_H; i++)
+  for (let i = 0; i < targetW * targetH; i++)
     hist[Math.round(lum(px[i*4], px[i*4+1], px[i*4+2]))]++;
 
   const clip = Math.max(1, Math.round(sw * sh * 0.005));
@@ -1693,11 +1701,11 @@ function resizeHistogramCanvas() {
   const w = histogramCanvas.offsetWidth;
   if (!w) return;
   const dpr = window.devicePixelRatio || 1;
-  const targetW = Math.round(w * dpr);
-  const targetH = Math.round(80 * dpr);
-  if (histogramCanvas.width === targetW && histogramCanvas.height === targetH) return;
-  histogramCanvas.width  = targetW;
-  histogramCanvas.height = targetH;
+  const histCanvasW = Math.round(w * dpr);
+  const histCanvasH = Math.round(80 * dpr);
+  if (histogramCanvas.width === histCanvasW && histogramCanvas.height === histCanvasH) return;
+  histogramCanvas.width  = histCanvasW;
+  histogramCanvas.height = histCanvasH;
 }
 
 function drawHistogram() {
@@ -1717,7 +1725,7 @@ function drawHistogram() {
   hc.clearRect(0, 0, cw, ch);
 
   // Compute per-bucket pixel counts from histogram (thresholds: 42, 127, 212)
-  const total = TARGET_W * TARGET_H;
+  const total = targetW * targetH;
   const ZONES = [
     { lo: 0,   hi: 41,  xLo: 0,   xHi: 42,  fill: 'rgba(0,0,0,0.5)',       pctColor: 'rgba(90,90,100,0.9)',   palette: 'rgb(0,0,0)' },
     { lo: 42,  hi: 126, xLo: 42,  xHi: 127, fill: 'rgba(85,85,85,0.28)',    pctColor: 'rgba(140,140,152,0.9)', palette: 'rgb(85,85,85)' },
@@ -1781,9 +1789,9 @@ function drawHistogram() {
   // Peak amplitude label — top-right corner
   hc.font = `${Math.round(9 * dpr)}px monospace`;
   hc.textBaseline = 'top';
-  hc.textAlign = 'right';
-  hc.fillStyle = 'rgba(90,90,104,0.8)';
-  hc.fillText('max ' + (binnedMax / total * 100).toFixed(1) + '%', cw - 4, 4);
+  hc.textAlign = 'left';
+  hc.fillStyle = 'rgba(185,185,195,0.9)';
+  hc.fillText('peak bin ' + Math.round(100 * binnedMax / totalPixels) + ' %', 4, 4);
 
   // Percentage labels — centered in each zone
   hc.font = `${Math.round(9 * dpr)}px monospace`;
@@ -1814,8 +1822,8 @@ window.addEventListener('resize', () => {
 
 function fitOffset(fw, fh) {
   const pos = fitAlign;
-  const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (TARGET_W - fw) / 2 : TARGET_W - fw;
-  const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (TARGET_H - fh) / 2 : TARGET_H - fh;
+  const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (targetW - fw) / 2 : targetW - fw;
+  const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (targetH - fh) / 2 : targetH - fh;
   return { x, y };
 }
 
@@ -1826,10 +1834,10 @@ function convert() {
   const ctx  = workCanvas.getContext('2d');
 
   ctx.fillStyle = fitBg === 'black' ? '#000000' : '#ffffff';
-  ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+  ctx.fillRect(0, 0, targetW, targetH);
 
   if (mode === 'fit') {
-    const fs = Math.min(TARGET_W / sw, TARGET_H / sh);
+    const fs = Math.min(targetW / sw, targetH / sh);
     const fw = sw * fs, fh = sh * fs;
     const off = fitOffset(fw, fh);
     ctx.drawImage(src, off.x, off.y, fw, fh);
@@ -1838,16 +1846,16 @@ function convert() {
     ctx.drawImage(src, -boxX * k, -boxY * k, sw * workScale, sh * workScale);
   }
 
-  const px  = ctx.getImageData(0, 0, TARGET_W, TARGET_H).data;
-  const buf = new Float32Array(TARGET_W * TARGET_H);
-  for (let i = 0; i < TARGET_W * TARGET_H; i++)
+  const px  = ctx.getImageData(0, 0, targetW, targetH).data;
+  const buf = new Float32Array(targetW * targetH);
+  for (let i = 0; i < targetW * targetH; i++)
     buf[i] = lum(px[i*4], px[i*4+1], px[i*4+2]);
 
   // Black/white point tone mapping
   if (blackPoint > 0 || whitePoint < 255) {
     const range = whitePoint - blackPoint;
     if (range > 0) {
-      for (let i = 0; i < TARGET_W * TARGET_H; i++)
+      for (let i = 0; i < targetW * targetH; i++)
         buf[i] = Math.max(0, Math.min(255, (buf[i] - blackPoint) / range * 255));
     }
   }
@@ -1855,34 +1863,34 @@ function convert() {
   // Gamma adjustment — Vout = Vin^(1/gamma)
   // gamma > 1: lifts shadows (brighter); gamma < 1: compresses shadows (darker)
   if (gammaValue !== 1.0 && gammaLUT) {
-    for (let i = 0; i < TARGET_W * TARGET_H; i++)
+    for (let i = 0; i < targetW * targetH; i++)
       buf[i] = gammaLUT[Math.min(255, Math.max(0, Math.round(buf[i])))];
   }
 
   // Contrast adjustment in sRGB space — pivot at midpoint 127.5
   if (contrastValue !== 0) {
     const factor = contrastValue >= 0 ? 1 + contrastValue * 2 / 100 : 1 + contrastValue / 100;
-    for (let i = 0; i < TARGET_W * TARGET_H; i++)
+    for (let i = 0; i < targetW * targetH; i++)
       buf[i] = Math.max(0, Math.min(255, (buf[i] - 127.5) * factor + 127.5));
   }
 
   // Inversion in sRGB space
   if (invert) {
-    for (let i = 0; i < TARGET_W * TARGET_H; i++)
+    for (let i = 0; i < targetW * targetH; i++)
       buf[i] = 255 - buf[i];
   }
 
   // Build histogram from fully-processed buf[] (after tone map + contrast + invert)
   lastHistogram = new Float32Array(256);
-  for (let i = 0; i < TARGET_W * TARGET_H; i++)
+  for (let i = 0; i < targetW * targetH; i++)
     lastHistogram[Math.min(255, Math.max(0, Math.round(buf[i])))]++;
   drawHistogram();
 
-  const q = new Uint8Array(TARGET_W * TARGET_H);
+  const q = new Uint8Array(targetW * targetH);
 
   if (!ditherEnabled) {
     // No dithering — quantize each pixel directly to the nearest palette entry
-    for (let i = 0; i < TARGET_W * TARGET_H; i++)
+    for (let i = 0; i < targetW * targetH; i++)
       q[i] = quantize(Math.max(0, Math.min(255, buf[i])));
   } else {
 
@@ -1897,9 +1905,9 @@ function convert() {
     if (ditherMode === 'bayer') {
       // Ordered (Bayer 4×4): no error bleeding, regular pattern.
       // Uses non-uniform thresholds matching GRAY_DISP palette levels.
-      for (let y = 0; y < TARGET_H; y++) {
-        for (let x = 0; x < TARGET_W; x++) {
-          const i = y * TARGET_W + x;
+      for (let y = 0; y < targetH; y++) {
+        for (let x = 0; x < targetW; x++) {
+          const i = y * targetW + x;
           const v = Math.max(0, Math.min(255, buf[i]));
           const t = BAYER4[y & 3][x & 3] / 16;  // 0..0.9375
           // Find the bracket this value falls in and use Bayer to round up or down
@@ -1918,16 +1926,16 @@ function convert() {
       //           X   7   5
       //   3   5   7   5   3
       //   1   3   5   3   1    ÷ 48
-      for (let y = 0; y < TARGET_H; y++) {
+      for (let y = 0; y < targetH; y++) {
         const ltr = (y & 1) === 0;
-        for (let xi = 0; xi < TARGET_W; xi++) {
-          const x  = ltr ? xi : TARGET_W - 1 - xi;
-          const i  = y * TARGET_W + x;
+        for (let xi = 0; xi < targetW; xi++) {
+          const x  = ltr ? xi : targetW - 1 - xi;
+          const i  = y * targetW + x;
           const v  = Math.max(0, Math.min(255, buf[i]));
           const qv = quantize(v);
           q[i]     = qv;
           const e  = v - GRAY_DISP[qv];
-          const W  = TARGET_W;
+          const W  = targetW;
           const d  = ltr ? 1 : -1;
           const k  = e / 48;
 
@@ -1936,7 +1944,7 @@ function convert() {
           if (x+d*2 >= 0 && x+d*2 < W)   buf[i+d*2]     += 5*k;
 
           // Next row — symmetric 5-wide kernel, unaffected by direction
-          if (y+1 < TARGET_H) {
+          if (y+1 < targetH) {
             if (x > 1)    buf[i+W-2] += 3*k;
             if (x > 0)    buf[i+W-1] += 5*k;
                           buf[i+W]   += 7*k;
@@ -1945,7 +1953,7 @@ function convert() {
           }
 
           // Row +2 — symmetric 5-wide kernel
-          if (y+2 < TARGET_H) {
+          if (y+2 < targetH) {
             if (x > 1)    buf[i+W*2-2] += 1*k;
             if (x > 0)    buf[i+W*2-1] += 3*k;
                           buf[i+W*2]   += 5*k;
@@ -1956,40 +1964,40 @@ function convert() {
       }
     } else {
       // Error-diffusion family — kernel weights defined per algorithm
-      for (let y = 0; y < TARGET_H; y++) {
-        for (let x = 0; x < TARGET_W; x++) {
-          const i  = y * TARGET_W + x;
+      for (let y = 0; y < targetH; y++) {
+        for (let x = 0; x < targetW; x++) {
+          const i  = y * targetW + x;
           const v  = Math.max(0, Math.min(255, buf[i]));
           const qv = quantize(v);
           q[i]     = qv;
           const e  = v - GRAY_DISP[qv];
-          const W  = TARGET_W;
+          const W  = targetW;
 
           switch (ditherMode) {
             case 'atk':  // Atkinson — 6/8 of error, 6 neighbours
               { const k = e / 8;
                 if (x+1 < W)          buf[i+1]     += k;
                 if (x+2 < W)          buf[i+2]     += k;
-                if (y+1 < TARGET_H) {
+                if (y+1 < targetH) {
                   if (x>0)            buf[i+W-1]   += k;
                                       buf[i+W]     += k;
                   if (x+1 < W)        buf[i+W+1]   += k;
                 }
-                if (y+2 < TARGET_H)   buf[i+W*2]   += k;
+                if (y+2 < targetH)   buf[i+W*2]   += k;
               } break;
 
             case 'jjn':  // Jarvis-Judice-Ninke — 3 rows, 12 neighbours, /48
               { const k = e / 48;
                 if (x+1 < W)          buf[i+1]     += 7*k;
                 if (x+2 < W)          buf[i+2]     += 5*k;
-                if (y+1 < TARGET_H) {
+                if (y+1 < targetH) {
                   if (x>1)            buf[i+W-2]   += 3*k;
                   if (x>0)            buf[i+W-1]   += 5*k;
                                       buf[i+W]     += 7*k;
                   if (x+1 < W)        buf[i+W+1]   += 5*k;
                   if (x+2 < W)        buf[i+W+2]   += 3*k;
                 }
-                if (y+2 < TARGET_H) {
+                if (y+2 < targetH) {
                   if (x>1)            buf[i+W*2-2] += 1*k;
                   if (x>0)            buf[i+W*2-1] += 3*k;
                                       buf[i+W*2]   += 5*k;
@@ -2002,14 +2010,14 @@ function convert() {
               { const k = e / 42;
                 if (x+1 < W)          buf[i+1]     += 8*k;
                 if (x+2 < W)          buf[i+2]     += 4*k;
-                if (y+1 < TARGET_H) {
+                if (y+1 < targetH) {
                   if (x>1)            buf[i+W-2]   += 2*k;
                   if (x>0)            buf[i+W-1]   += 4*k;
                                       buf[i+W]     += 8*k;
                   if (x+1 < W)        buf[i+W+1]   += 4*k;
                   if (x+2 < W)        buf[i+W+2]   += 2*k;
                 }
-                if (y+2 < TARGET_H) {
+                if (y+2 < targetH) {
                   if (x>1)            buf[i+W*2-2] += 1*k;
                   if (x>0)            buf[i+W*2-1] += 2*k;
                                       buf[i+W*2]   += 4*k;
@@ -2022,7 +2030,7 @@ function convert() {
               { const k = e / 32;
                 if (x+1 < W)          buf[i+1]     += 8*k;
                 if (x+2 < W)          buf[i+2]     += 4*k;
-                if (y+1 < TARGET_H) {
+                if (y+1 < targetH) {
                   if (x>1)            buf[i+W-2]   += 2*k;
                   if (x>0)            buf[i+W-1]   += 4*k;
                                       buf[i+W]     += 8*k;
@@ -2033,7 +2041,7 @@ function convert() {
 
             default:  // Floyd-Steinberg
               if (x+1 < W)            buf[i+1]     += e * 7/16;
-              if (y+1 < TARGET_H) {
+              if (y+1 < targetH) {
                 if (x>0)              buf[i+W-1]   += e * 3/16;
                                       buf[i+W]     += e * 5/16;
                 if (x+1 < W)          buf[i+W+1]   += e * 1/16;
@@ -2048,16 +2056,16 @@ function convert() {
 
   // ── Render preview ──────────────────────────────────────────────────────────
   const pc  = previewCanvas.getContext('2d');
-  const id  = pc.createImageData(TARGET_W, TARGET_H);
-  for (let i = 0; i < TARGET_W * TARGET_H; i++) {
+  const id  = pc.createImageData(targetW, targetH);
+  for (let i = 0; i < targetW * targetH; i++) {
     const g = GRAY_DISP[q[i]];
     id.data[i*4] = id.data[i*4+1] = id.data[i*4+2] = g;
     id.data[i*4+3] = 255;
   }
   pc.putImageData(id, 0, 0);
 
-  pxcBytes = encodePxc(q, TARGET_W, TARGET_H);
-  bmpBytes = encodeBmp(q, TARGET_W, TARGET_H);
+  pxcBytes = encodePxc(q, targetW, targetH);
+  bmpBytes = encodeBmp(q, targetW, targetH);
   downloadGroup.classList.add('visible');
 }
 
@@ -2268,13 +2276,13 @@ function drawGbSource() {
 function buildGbOutput() {
   const rot     = rotatePixels(gbPixels, gbW, gbH, gbRotation);
   const rW      = rot.w, rH = rot.h;
-  const sw      = Math.min(rW * gbOutputScale, TARGET_W);
-  const sh      = Math.min(rH * gbOutputScale, TARGET_H);
-  const ox      = Math.round((TARGET_W - sw) / 2);
-  const oy      = Math.round((TARGET_H - sh) / 2);
+  const sw      = Math.min(rW * gbOutputScale, targetW);
+  const sh      = Math.min(rH * gbOutputScale, targetH);
+  const ox      = Math.round((targetW - sw) / 2);
+  const oy      = Math.round((targetH - sh) / 2);
 
   const bgPxc = fitBg === 'black' ? 0 : 3;
-  const q     = new Uint8Array(TARGET_W * TARGET_H).fill(bgPxc);
+  const q     = new Uint8Array(targetW * targetH).fill(bgPxc);
 
   for (let y = 0; y < sh; y++) {
     const srcY = Math.floor(y / gbOutputScale);
@@ -2283,20 +2291,20 @@ function buildGbOutput() {
       let c = rot.pixels[srcY * rW + srcX];
       if (gbPalletShades) c = gbPalletShades[c];
       if (gbInvert)       c = 3 - c;
-      q[(oy + y) * TARGET_W + (ox + x)] = GB_TO_PXC[c];
+      q[(oy + y) * targetW + (ox + x)] = GB_TO_PXC[c];
     }
   }
 
   const pc = previewCanvas.getContext('2d');
-  const id = pc.createImageData(TARGET_W, TARGET_H);
-  for (let i = 0; i < TARGET_W * TARGET_H; i++) {
+  const id = pc.createImageData(targetW, targetH);
+  for (let i = 0; i < targetW * targetH; i++) {
     const g = GRAY_DISP[q[i]];
     id.data[i*4] = id.data[i*4+1] = id.data[i*4+2] = g;
     id.data[i*4+3] = 255;
   }
   pc.putImageData(id, 0, 0);
 
-  pxcBytes   = encodePxc(q, TARGET_W, TARGET_H);
+  pxcBytes   = encodePxc(q, targetW, targetH);
   gbBmpBytes = encodeNativeBmp(q);
   downloadGroup.classList.add('visible');
 
@@ -2309,7 +2317,7 @@ function buildGbOutput() {
 // BMP3, 4-bit indexed, top-down, palette = GB colors 0–3 per gbPaletteKey.
 function encodeNativeBmp(q) {
   const pal       = PALETTES[gbPaletteKey];
-  const cw = TARGET_W, ch = TARGET_H;
+  const cw = targetW, ch = targetH;
   const rowStride = Math.ceil(cw / 2 + 3) & ~3;
   const palBytes  = 4 * 4;
   const hdrBytes  = 14 + 40;
@@ -2366,7 +2374,7 @@ document.querySelectorAll('[data-gbpalette]').forEach(btn => {
 document.getElementById('gbScaleUpBtn').addEventListener('click', () => {
   if (!gbPixels) return;
   const rot = rotatePixels(gbPixels, gbW, gbH, gbRotation);
-  const maxScale = Math.min(Math.floor(TARGET_W / rot.w), Math.floor(TARGET_H / rot.h));
+  const maxScale = Math.min(Math.floor(targetW / rot.w), Math.floor(targetH / rot.h));
   if (gbOutputScale < maxScale) {
     gbOutputScale++;
     document.getElementById('gbScaleVal').textContent = gbOutputScale + '×';
@@ -2479,12 +2487,12 @@ previewCanvas.addEventListener('mousemove', e => {
   if (!pxcBytes) return;
 
   const rect = previewCanvas.getBoundingClientRect();
-  const cx = Math.round((e.clientX - rect.left) / rect.width  * TARGET_W);
-  const cy = Math.round((e.clientY - rect.top)  / rect.height * TARGET_H);
+  const cx = Math.round((e.clientX - rect.left) / rect.width  * targetW);
+  const cy = Math.round((e.clientY - rect.top)  / rect.height * targetH);
 
   const half = ZOOM_SRC / 2;
-  const sx = Math.max(0, Math.min(TARGET_W - ZOOM_SRC, cx - half));
-  const sy = Math.max(0, Math.min(TARGET_H - ZOOM_SRC, cy - half));
+  const sx = Math.max(0, Math.min(targetW - ZOOM_SRC, cx - half));
+  const sy = Math.max(0, Math.min(targetH - ZOOM_SRC, cy - half));
 
   const zc = zoomCanvas.getContext('2d');
   zc.imageSmoothingEnabled = false;
