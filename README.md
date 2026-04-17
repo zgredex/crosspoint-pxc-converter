@@ -72,6 +72,7 @@ CrossPoint picks from `/.sleep/` at random if multiple files are present. PXC an
 - **Mirror** — flip horizontal or vertical
 - **Zoom controls** — 0.5×, 0.75×, 1×, 1.5×, 2×, 3×, 4× zoom for precise crop positioning on high-res images
 - Scrollable/pannable source view — navigate large images without scaling them down
+- Source preview rendered with **Lanczos3** — what you see in the editor reflects the actual downscaling quality
 
 ### Tone pipeline (image mode)
 Controls are arranged in processing order:
@@ -92,6 +93,10 @@ The gamma slider (0.30–3.00, default 1.00) remaps luminance non-linearly using
 - **γ = 1** — no change
 
 Gamma is applied after black/white point mapping and before contrast, so you can first set your tonal range with the black/white sliders, then use gamma to redistribute tones within that range.
+
+### Scaling (image mode)
+
+Images are downscaled using **Lanczos3** (via [pica](https://github.com/nodeca/pica)) with a post-resize unsharp mask (`amount 80, radius 0.6, threshold 2`). This applies to both the source editor preview and the output conversion, so the displayed crop is an accurate representation of the final result. Browser-default bilinear interpolation is not used.
 
 ### Dithering (image mode)
 All error-diffusion algorithms use BT.601 luminance in sRGB space and quantise against sRGB palette values `[0, 85, 170, 255]`, matching ImageMagick's `-colorspace Gray` pipeline.
