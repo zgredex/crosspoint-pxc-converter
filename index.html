@@ -1481,7 +1481,7 @@ function loadFile(file) {
   }
 }
 
-function resetEditor() {
+async function resetEditor() {
   if (rotation !== 0 || mirrorH || mirrorV) buildRotatedSrc();
   const src = getSource();
   const sw = srcW(src), sh = srcH(src);
@@ -1508,7 +1508,7 @@ function resetEditor() {
 
   sourceCanvas.width  = dispImgW;
   sourceCanvas.height = dispImgH;
-  sourceCanvas.getContext('2d').drawImage(src, 0, 0, dispImgW, dispImgH);
+  await picaInstance.resize(src, sourceCanvas, PICA_OPTS);
   sourceFrame.style.width  = Math.min(dispImgW, MAX_EDITOR_W) + 'px';
   sourceFrame.style.height = Math.min(dispImgH, MAX_EDITOR_H) + 'px';
 
