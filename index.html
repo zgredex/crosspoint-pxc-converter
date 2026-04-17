@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/pica@9/dist/pica.min.js"></script>
   <style>
     :root {
       --bg:        #0d0d0f;
@@ -1081,6 +1082,7 @@ let isDragging = false;
 let dragStartX = 0, dragStartY = 0, dragStartBX = 0, dragStartBY = 0;
 let snapH = false, snapV = false;
 let convertTimer = null;
+let convertGen   = 0;
 
 const dropZone      = document.getElementById('dropZone');
 const fileInput     = document.getElementById('fileInput');
@@ -1827,8 +1829,12 @@ function fitOffset(fw, fh) {
   return { x, y };
 }
 
-function convert() {
+const picaInstance = pica();
+const PICA_OPTS = { filter: 'lanczos3', unsharpAmount: 80, unsharpRadius: 0.6, unsharpThreshold: 2 };
+
+async function convert() {
   if (!loadedImg) return;
+  const gen = ++convertGen;
   const src  = getSource();
   const sw   = srcW(src), sh = srcH(src);
   const ctx  = workCanvas.getContext('2d');
@@ -1838,12 +1844,24 @@ function convert() {
 
   if (mode === 'fit') {
     const fs = Math.min(targetW / sw, targetH / sh);
-    const fw = sw * fs, fh = sh * fs;
+    const fw = Math.max(1, Math.round(sw * fs));
+    const fh = Math.max(1, Math.round(sh * fs));
     const off = fitOffset(fw, fh);
-    ctx.drawImage(src, off.x, off.y, fw, fh);
+    const fitCanvas = document.createElement('canvas');
+    fitCanvas.width = fw; fitCanvas.height = fh;
+    await picaInstance.resize(src, fitCanvas, PICA_OPTS);
+    if (gen !== convertGen) return;
+    ctx.drawImage(fitCanvas, off.x, off.y);
   } else {
-    const k = workScale / displayScale;
-    ctx.drawImage(src, -boxX * k, -boxY * k, sw * workScale, sh * workScale);
+    const srcX  = Math.max(0, Math.round(boxX / displayScale));
+    const srcY  = Math.max(0, Math.round(boxY / displayScale));
+    const cropW = Math.max(1, Math.min(sw - srcX, Math.round(targetW / workScale)));
+    const cropH = Math.max(1, Math.min(sh - srcY, Math.round(targetH / workScale)));
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = cropW; cropCanvas.height = cropH;
+    cropCanvas.getContext('2d').drawImage(src, srcX, srcY, cropW, cropH, 0, 0, cropW, cropH);
+    await picaInstance.resize(cropCanvas, workCanvas, PICA_OPTS);
+    if (gen !== convertGen) return;
   }
 
   const px  = ctx.getImageData(0, 0, targetW, targetH).data;
