@@ -62,8 +62,9 @@ CrossPoint picks from `/.sleep/` at random if multiple files are present. PXC an
 - **X3** — 528×792
 
 ### Image input
-- Drag and drop, click to browse, or **paste from clipboard** (Ctrl+V / Cmd+V)
+- Drag and drop, click to browse, or **paste an image from clipboard** (Ctrl+V / Cmd+V)
 - Auto-detects file type: images go to image mode, `.2bpp` / `.bin` / `.gb` / `.txt` go to Game Boy mode
+- Invalid inputs and decode failures are shown inline in the app instead of failing silently
 
 ### Source editor (image mode)
 - **Crop mode** — drag or click to reposition the crop window; snap guides appear when aligned to centre
@@ -119,16 +120,17 @@ Live tone distribution panel showing:
 - Threshold markers at 42, 127, 212
 
 ### Game Boy 2BPP mode
-Drop or paste a Game Boy 2BPP binary (`.2bpp`, `.bin`, `.gb`) or a **GB Printer text log** (`.txt`) to enter GB mode. The app auto-detects the file type.
+Drop or browse a Game Boy 2BPP binary (`.2bpp`, `.bin`, `.gb`) or drop / browse / paste a **GB Printer text log** (`.txt` or plain text clipboard contents) to enter GB mode. The app auto-detects the input type.
 
 | Control | Description |
 |---------|-------------|
-| **Output scale** | Integer pixel-perfect scaling of the GB art on the sleep screen: 1×, 2×, 3× … up to the maximum that fits the target resolution. The image is centred; unused area fills with the background colour. |
+| **Output scale** | Integer pixel-perfect scaling of the GB art on the sleep screen: 1×, 2×, 3× … up to the maximum that fits the target resolution. The image is centred; unused area fills with the selected background colour. |
+| **Background** | White or black fill used for the unused area around centred GB output. |
 | **BMP palette** | Colour palette used for the `.bmp` export: DMG (green), Pocket (sepia), B&W (greyscale), SGB (purple/orange). The `.pxc` output is always greyscale. |
 | **Invert** | Flip GB colour indices (0↔3, 1↔2) before conversion. |
 | **Rotation** | 90° CW / CCW steps, same as image mode. |
 
-**GB Printer text log** support: paste the serial log from a GB Printer capture tool. The parser reads hex byte lines and extracts the `PRNT` pallet register to apply the correct colour mapping automatically.
+**GB Printer text log** support: paste the serial log from a GB Printer capture tool directly into the app, or load it from a `.txt` file. The parser reads hex byte lines and extracts the `PRNT` pallet register to apply the correct colour mapping automatically.
 
 **GB → e-ink mapping:**
 
@@ -146,6 +148,34 @@ Drop or paste a Game Boy 2BPP binary (`.2bpp`, `.bin`, `.gb`) or a **GB Printer 
 ### Export
 - **Download .pxc** — CrossPoint native format
 - **Download .bmp** — 4-bit indexed BMP (greyscale palette in image mode; GB colour palette in GB mode)
+
+---
+
+## Development
+
+### Local workflow
+
+```bash
+npm install
+npm run dev
+```
+
+### Validation
+
+```bash
+npm run build
+npm run test
+```
+
+### Architecture
+
+- `src/app/` — store, reducer, actions, and bootstrap composition
+- `src/domain/` — pure image, GB, histogram, dithering, and format logic
+- `src/features/` — image-mode and GB-mode orchestration
+- `src/infra/` — browser and canvas adapters
+- `src/ui/` — DOM refs, rendering, bindings, crop interaction, and preview zoom
+
+The app remains fully browser-side: no uploads, no server processing, and static-host deployment stays compatible with Cloudflare Pages.
 
 ---
 

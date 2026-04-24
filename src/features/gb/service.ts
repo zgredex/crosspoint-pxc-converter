@@ -1,0 +1,119 @@
+import type { FitBackground } from '../../app/state';
+import type { GbPaletteKey } from '../../domain/formats/bmpGb';
+import { encodeGbBmp } from '../../domain/formats/bmpGb';
+import { encodePxc } from '../../domain/formats/pxc';
+import { rotatePixels } from '../../domain/gb/rotatePixels';
+
+const GB_TO_PXC = [3, 2, 1, 0] as const;
+
+export type GbSourceView = {
+  pixels: Uint8Array;
+  width: number;
+  height: number;
+  displayScale: number;
+};
+
+export type GbOutputArtifacts = {
+  indexedPixels: Uint8Array;
+  pxcBytes: Uint8Array;
+  bmpBytes: Uint8Array;
+};
+
+export type GbFileInfo = {
+  name: string;
+  sizeText: string;
+  tilesText: string;
+  dimsText: string;
+  warningText: string | null;
+  paletteInfoText: string | null;
+};
+
+export function buildGbSourceView(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  rotation: 0 | 90 | 180 | 270,
+  zoom: number,
+): GbSourceView {
+  const rotated = rotatePixels(pixels, width, height, rotation);
+  const autoScale = Math.max(1, Math.min(6, Math.floor(400 / rotated.w)));
+
+  return {
+    pixels: rotated.pixels,
+    width: rotated.w,
+    height: rotated.h,
+    displayScale: zoom > 0 ? zoom : autoScale,
+  };
+}
+
+export function buildGbOutputArtifacts(params: {
+  pixels: Uint8Array;
+  width: number;
+  height: number;
+  rotation: 0 | 90 | 180 | 270;
+  outputScale: number;
+  targetW: number;
+  targetH: number;
+  background: FitBackground;
+  paletteRemap: number[] | null;
+  invert: boolean;
+  paletteKey: GbPaletteKey;
+}): GbOutputArtifacts {
+  const rotated = rotatePixels(params.pixels, params.width, params.height, params.rotation);
+  const scaledW = Math.min(rotated.w * params.outputScale, params.targetW);
+  const scaledH = Math.min(rotated.h * params.outputScale, params.targetH);
+  const offsetX = Math.round((params.targetW - scaledW) / 2);
+  const offsetY = Math.round((params.targetH - scaledH) / 2);
+  const backgroundLevel = params.background === 'black' ? 0 : 3;
+  const indexedPixels = new Uint8Array(params.targetW * params.targetH).fill(backgroundLevel);
+
+  for (let y = 0; y < scaledH; y++) {
+    const srcY = Math.floor(y / params.outputScale);
+    for (let x = 0; x < scaledW; x++) {
+      const srcX = Math.floor(x / params.outputScale);
+      let color = rotated.pixels[srcY * rotated.w + srcX];
+      if (params.paletteRemap) color = params.paletteRemap[color];
+      if (params.invert) color = 3 - color;
+      indexedPixels[(offsetY + y) * params.targetW + (offsetX + x)] = GB_TO_PXC[color];
+    }
+  }
+
+  return {
+    indexedPixels,
+    pxcBytes: encodePxc(indexedPixels, params.targetW, params.targetH),
+    bmpBytes: encodeGbBmp(indexedPixels, params.targetW, params.targetH, params.paletteKey),
+  };
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+export function buildGbFileInfo(params: {
+  name: string;
+  rawByteLength: number;
+  tilesWide: number;
+  paletteRemap: number[] | null;
+}): GbFileInfo {
+  const totalTiles = Math.floor(params.rawByteLength / 16);
+  const trailingBytes = params.rawByteLength % 16;
+  const tilesHigh = Math.ceil(totalTiles / params.tilesWide);
+
+  let paletteInfoText: string | null = null;
+  if (params.paletteRemap) {
+    const names = ['W', 'LG', 'DG', 'B'];
+    const register = params.paletteRemap.reduce((acc, shade, index) => acc | (shade << (index * 2)), 0);
+    const mapping = params.paletteRemap.map((shade, index) => `${names[index]}→${names[shade]}`).join(' ');
+    paletteInfoText = `0x${register.toString(16).toUpperCase().padStart(2, '0')} (${mapping})`;
+  }
+
+  return {
+    name: params.name,
+    sizeText: formatBytes(params.rawByteLength),
+    tilesText: `${totalTiles} (${params.tilesWide}×${tilesHigh})`,
+    dimsText: `${params.tilesWide * 8} × ${tilesHigh * 8} px`,
+    warningText: trailingBytes ? `⚠ ${trailingBytes} trailing byte${trailingBytes > 1 ? 's' : ''} ignored` : null,
+    paletteInfoText,
+  };
+}
