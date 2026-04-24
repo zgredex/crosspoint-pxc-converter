@@ -11,7 +11,7 @@ type BindingDeps = {
   store: AppStore;
   scheduleConvert: (delay: number) => void;
   rebuildGammaLUT: () => void;
-  autoLevels: () => void;
+  autoLevels: () => void | Promise<void>;
   onDeviceChanged: () => void;
   onImageLayoutChanged: () => void;
   onGbVisualChanged: () => void;
@@ -70,7 +70,9 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     scheduleConvert(0);
   });
 
-  dom.autoLevelsBtn.addEventListener('click', autoLevels);
+  dom.autoLevelsBtn.addEventListener('click', () => {
+    void autoLevels();
+  });
 
   dom.gammaSlider.addEventListener('input', () => {
     let nextGammaValue = parseInt(dom.gammaSlider.value) / 100;

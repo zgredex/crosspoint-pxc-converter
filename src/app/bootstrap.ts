@@ -1,7 +1,7 @@
 import { actions } from './actions';
 import { store } from './store';
 import { DEFAULT_XT, DEVICES } from '../domain/devices';
-import { fitOffset, type FitAlign } from '../domain/geometry';
+import { buildImageRenderPlan, type FitAlign } from '../domain/geometry';
 import { decode2bpp } from '../domain/gb/decode2bpp';
 import { parsePrinterTxt } from '../domain/gb/parsePrinterTxt';
 import { rotatePixels } from '../domain/gb/rotatePixels';
@@ -15,7 +15,7 @@ import { renderHistogram, resizeHistogramCanvas } from '../infra/canvas/histogra
 import { createPicaResizer, resizeWithPica } from '../infra/canvas/picaResize';
 import { renderIndexedPreview } from '../infra/canvas/previewRenderer';
 import { buildGbFileInfo, buildGbOutputArtifacts, buildGbSourceView } from '../features/gb/service';
-import { buildImageOutputs } from '../features/image/service';
+import { buildImageOutputs, renderImageBaseRaster } from '../features/image/service';
 import { bindStoreControls } from '../ui/bindings';
 import { setupCropInteraction } from '../ui/cropInteraction';
 import { dom } from '../ui/dom';
@@ -101,6 +101,7 @@ let lastHistogram: Float32Array | null = null;
 
 let convertTimer: ReturnType<typeof setTimeout> | null = null;
 let convertGen   = 0;
+let autoLevelsGen = 0;
 
 function syncRuntimeState() {
   const state = store.getState();
@@ -550,40 +551,40 @@ const { clearSnap } = setupCropInteraction({
   scheduleConvert,
 });
 
-function autoLevels(): void {
+async function autoLevels(): Promise<void> {
   if (!loadedImg) return;
+  const gen = ++autoLevelsGen;
   const src = getSource();
   const sw = srcW(src), sh = srcH(src);
-
-  // Render the same crop/fit region that convert() would process —
-  // not the full source — so Auto responds to what is actually visible.
   const tmp = createCanvas(targetW, targetH);
-  const tc = getContext2d(tmp);
-  tc.fillStyle = fitBg === 'black' ? '#000000' : '#ffffff';
-  tc.fillRect(0, 0, targetW, targetH);
-  if (mode === 'fit') {
-    const fs = Math.min(targetW / sw, targetH / sh);
-    const fw = sw * fs, fh = sh * fs;
-    const off = fitOffset(fw, fh, targetW, targetH, fitAlign);
-    tc.drawImage(src, off.x, off.y, fw, fh);
-  } else {
-    const k = workScale / displayScale;
-    tc.drawImage(src, -boxX * k, -boxY * k, sw * workScale, sh * workScale);
-  }
+  const plan = buildImageRenderPlan({
+    mode,
+    sourceW: sw,
+    sourceH: sh,
+    targetW,
+    targetH,
+    fitAlign,
+    displayScale,
+    workScale,
+    boxX,
+    boxY,
+  });
+  await renderImageBaseRaster({
+    src,
+    targetCanvas: tmp,
+    plan,
+    fitBg,
+    pica: picaInstance,
+  });
+  if (gen !== autoLevelsGen) return;
 
-  const px = tc.getImageData(0, 0, targetW, targetH).data;
+  const px = getContext2d(tmp).getImageData(0, 0, targetW, targetH).data;
   const levels = computeAutoLevels(buildUintHistogram(buildLuminanceBuffer(px)), totalPixels);
 
   store.dispatch(actions.imageSetBlackPoint(levels.blackPoint));
   store.dispatch(actions.imageSetWhitePoint(levels.whitePoint));
   // Reset gamma so B/W points are calibrated on the clean unmodified range
   store.dispatch(actions.imageSetGamma(1.0));
-  blackSlider.value = String(blackPoint);
-  whiteSlider.value = String(whitePoint);
-  blackValEl.textContent = String(blackPoint);
-  whiteValEl.textContent = String(whitePoint);
-  gammaSlider.value = '100';
-  gammaValEl.textContent = '1.00';
   rebuildGammaLUT();
   scheduleConvert(0);
 }
@@ -606,32 +607,28 @@ async function convert(): Promise<void> {
   const gen = ++convertGen;
   const src  = getSource();
   const sw   = srcW(src), sh = srcH(src);
-  const ctx  = getContext2d(workCanvas);
+  const plan = buildImageRenderPlan({
+    mode,
+    sourceW: sw,
+    sourceH: sh,
+    targetW,
+    targetH,
+    fitAlign,
+    displayScale,
+    workScale,
+    boxX,
+    boxY,
+  });
+  await renderImageBaseRaster({
+    src,
+    targetCanvas: workCanvas,
+    plan,
+    fitBg,
+    pica: picaInstance,
+  });
+  if (gen !== convertGen) return;
 
-  ctx.fillStyle = fitBg === 'black' ? '#000000' : '#ffffff';
-  ctx.fillRect(0, 0, targetW, targetH);
-
-  if (mode === 'fit') {
-    const fs = Math.min(targetW / sw, targetH / sh);
-    const fw = Math.max(1, Math.round(sw * fs));
-    const fh = Math.max(1, Math.round(sh * fs));
-    const off = fitOffset(fw, fh, targetW, targetH, fitAlign);
-    const fitCanvas = createCanvas(fw, fh);
-    await resizeWithPica(picaInstance, src, fitCanvas);
-    if (gen !== convertGen) return;
-    ctx.drawImage(fitCanvas, off.x, off.y);
-  } else {
-    const srcX  = Math.max(0, Math.round(boxX / displayScale));
-    const srcY  = Math.max(0, Math.round(boxY / displayScale));
-    const cropW = Math.max(1, Math.min(sw - srcX, Math.round(targetW / workScale)));
-    const cropH = Math.max(1, Math.min(sh - srcY, Math.round(targetH / workScale)));
-    const cropCanvas = createCanvas(cropW, cropH);
-    getContext2d(cropCanvas).drawImage(src, srcX, srcY, cropW, cropH, 0, 0, cropW, cropH);
-    await resizeWithPica(picaInstance, cropCanvas, workCanvas);
-    if (gen !== convertGen) return;
-  }
-
-  const outputs = buildImageOutputs(ctx.getImageData(0, 0, targetW, targetH).data, targetW, targetH, {
+  const outputs = buildImageOutputs(getContext2d(workCanvas).getImageData(0, 0, targetW, targetH).data, targetW, targetH, {
     blackPoint,
     whitePoint,
     gammaValue,

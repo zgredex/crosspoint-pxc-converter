@@ -1,6 +1,6 @@
 import picaFactory from 'pica';
 
-type PicaResizer = {
+export type PicaResizer = {
   resize(source: CanvasImageSource, destination: HTMLCanvasElement, options: object): Promise<void>;
 };
 
