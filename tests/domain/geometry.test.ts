@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildImageRenderPlan, fitOffset } from '../../src/domain/geometry';
+import { buildImageRenderPlan, fitOffset, getImageAnalysisRegion } from '../../src/domain/geometry';
 
 describe('fitOffset', () => {
   it('computes centered placement', () => {
@@ -52,6 +52,40 @@ describe('buildImageRenderPlan', () => {
       srcY: 40,
       cropW: 240,
       cropH: 400,
+    });
+  });
+});
+
+describe('getImageAnalysisRegion', () => {
+  it('uses only the fitted image area for fit mode analysis', () => {
+    expect(getImageAnalysisRegion({
+      kind: 'fit',
+      fittedWidth: 300,
+      fittedHeight: 500,
+      offsetX: 90,
+      offsetY: 150,
+    }, 480, 800)).toEqual({
+      x: 90,
+      y: 150,
+      width: 300,
+      height: 500,
+      pixelCount: 150000,
+    });
+  });
+
+  it('uses the full target area for crop mode analysis', () => {
+    expect(getImageAnalysisRegion({
+      kind: 'crop',
+      srcX: 10,
+      srcY: 20,
+      cropW: 300,
+      cropH: 400,
+    }, 480, 800)).toEqual({
+      x: 0,
+      y: 0,
+      width: 480,
+      height: 800,
+      pixelCount: 384000,
     });
   });
 });

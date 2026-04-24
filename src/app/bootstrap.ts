@@ -1,7 +1,7 @@
 import { actions } from './actions';
 import { store } from './store';
 import { DEFAULT_XT, DEVICES } from '../domain/devices';
-import { buildImageRenderPlan, type FitAlign } from '../domain/geometry';
+import { buildImageRenderPlan, getImageAnalysisRegion, type FitAlign } from '../domain/geometry';
 import { decode2bpp } from '../domain/gb/decode2bpp';
 import { parsePrinterTxt } from '../domain/gb/parsePrinterTxt';
 import { rotatePixels } from '../domain/gb/rotatePixels';
@@ -578,8 +578,17 @@ async function autoLevels(): Promise<void> {
   });
   if (gen !== autoLevelsGen) return;
 
-  const px = getContext2d(tmp).getImageData(0, 0, targetW, targetH).data;
-  const levels = computeAutoLevels(buildUintHistogram(buildLuminanceBuffer(px)), totalPixels);
+  const analysisRegion = getImageAnalysisRegion(plan, targetW, targetH);
+  const px = getContext2d(tmp).getImageData(
+    analysisRegion.x,
+    analysisRegion.y,
+    analysisRegion.width,
+    analysisRegion.height,
+  ).data;
+  const levels = computeAutoLevels(
+    buildUintHistogram(buildLuminanceBuffer(px)),
+    analysisRegion.pixelCount,
+  );
 
   store.dispatch(actions.imageSetBlackPoint(levels.blackPoint));
   store.dispatch(actions.imageSetWhitePoint(levels.whitePoint));

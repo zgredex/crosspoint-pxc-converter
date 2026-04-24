@@ -16,6 +16,14 @@ export type ImageRenderPlan =
       cropH: number;
     };
 
+export type ImageAnalysisRegion = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pixelCount: number;
+};
+
 export function fitOffset(fw: number, fh: number, targetW: number, targetH: number, pos: FitAlign): { x: number; y: number } {
   const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (targetW - fw) / 2 : targetW - fw;
   const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (targetH - fh) / 2 : targetH - fh;
@@ -60,5 +68,29 @@ export function buildImageRenderPlan(params: {
     srcY,
     cropW,
     cropH,
+  };
+}
+
+export function getImageAnalysisRegion(
+  plan: ImageRenderPlan,
+  targetW: number,
+  targetH: number,
+): ImageAnalysisRegion {
+  if (plan.kind === 'fit') {
+    return {
+      x: Math.round(plan.offsetX),
+      y: Math.round(plan.offsetY),
+      width: plan.fittedWidth,
+      height: plan.fittedHeight,
+      pixelCount: plan.fittedWidth * plan.fittedHeight,
+    };
+  }
+
+  return {
+    x: 0,
+    y: 0,
+    width: targetW,
+    height: targetH,
+    pixelCount: targetW * targetH,
   };
 }
