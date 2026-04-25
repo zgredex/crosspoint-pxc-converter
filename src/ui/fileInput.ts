@@ -10,7 +10,6 @@ type FileInputDeps = {
 export function bindFileInput(deps: FileInputDeps): void {
   const { dom, loadFile, loadPrinterText } = deps;
 
-  dom.dropZone.addEventListener('click', () => dom.fileInput.click());
   dom.dropZone.addEventListener('dragover', event => {
     event.preventDefault();
     dom.dropZone.classList.add('over');

@@ -103,6 +103,7 @@ h1 {
 
 /* Drop zone */
 .drop-zone {
+  position: relative;
   width: 100%;
   min-height: 140px;
   border: 1.5px dashed var(--border2);
@@ -129,7 +130,17 @@ h1 {
   color: var(--muted2);
   margin-top: -4px;
 }
-#fileInput { display: none; }
+#fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Source editor */
 .editor-section { display: none; width: 100%; }
