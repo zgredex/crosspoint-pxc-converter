@@ -169,13 +169,22 @@ npm run test
 
 ### Architecture
 
-- `src/app/` — store, reducer, actions, and bootstrap composition
-- `src/domain/` — pure image, GB, histogram, dithering, and format logic
-- `src/features/` — image-mode and GB-mode orchestration
+- `src/app/` — app composition, store, reducer, runtime state containers, loader routing, and shared status/validation helpers
+- `src/domain/` — pure image, GB, histogram, dithering, geometry, and format logic
+- `src/features/` — image-mode and GB-mode controllers plus feature services/helpers
 - `src/infra/` — browser and canvas adapters
-- `src/ui/` — DOM refs, rendering, bindings, crop interaction, and preview zoom
+- `src/ui/` — DOM refs, rendering, bindings, mode visibility, crop interaction, preview zoom, and UI event modules
 
 The app remains fully browser-side: no uploads, no server processing, and static-host deployment stays compatible with Cloudflare Pages.
+
+### Code map
+
+- `src/app/bootstrap.ts` — composition root that wires the store, runtime containers, controllers, rendering, and UI bindings together
+- `src/app/runtime/*` — ephemeral runtime state for image, GB, and export sessions
+- `src/features/image/controller.ts` — image load/unload, editor reset, auto-levels, and conversion orchestration
+- `src/features/gb/controller.ts` — GB binary/printer-log loading, decode, source rendering, and output orchestration
+- `src/ui/render.ts` — store-driven DOM state synchronization for visible UI
+- `tests/` — Vitest coverage for app state, domain logic, and feature controllers/services
 
 ---
 
