@@ -104,7 +104,7 @@ const { clearSnap } = setupCropInteraction({
     imageRuntime.boxY = y;
   },
   applyCropBox,
-  scheduleConvert: imageController.requestConvert,
+  scheduleConvert: delay => imageController.requestConvert(delay),
 });
 
 // Histogram
