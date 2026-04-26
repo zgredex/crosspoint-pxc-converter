@@ -1,6 +1,7 @@
 import type { FitBackground } from '../../app/state';
 import type { GbPaletteKey } from '../../domain/formats/bmpGb';
 import { encodeGbBmp } from '../../domain/formats/bmpGb';
+import { GB_SHADE_NAMES } from '../../domain/gb/constants';
 import { encodePxc } from '../../domain/formats/pxc';
 import { rotatePixels } from '../../domain/gb/rotatePixels';
 
@@ -102,9 +103,8 @@ export function buildGbFileInfo(params: {
 
   let paletteInfoText: string | null = null;
   if (params.paletteRemap) {
-    const names = ['W', 'LG', 'DG', 'B'];
     const register = params.paletteRemap.reduce((acc, shade, index) => acc | (shade << (index * 2)), 0);
-    const mapping = params.paletteRemap.map((shade, index) => `${names[index]}→${names[shade]}`).join(' ');
+    const mapping = params.paletteRemap.map((shade, index) => `${GB_SHADE_NAMES[index]}→${GB_SHADE_NAMES[shade]}`).join(' ');
     paletteInfoText = `0x${register.toString(16).toUpperCase().padStart(2, '0')} (${mapping})`;
   }
 

@@ -67,6 +67,27 @@ describe('app reducer', () => {
     expect(next.gb).toEqual(initialAppState.gb);
   });
 
+  it('stores shared background outside the image slice', () => {
+    const next = reducer(initialAppState, actions.setBackground('black'));
+
+    expect(next.background).toBe('black');
+    expect(next.image).toEqual(initialAppState.image);
+  });
+
+  it('clamps black and white points in the reducer', () => {
+    const clampedBlack = reducer(
+      { ...initialAppState, image: { ...initialAppState.image, whitePoint: 100 } },
+      actions.imageSetBlackPoint(150),
+    );
+    const clampedWhite = reducer(
+      { ...initialAppState, image: { ...initialAppState.image, blackPoint: 90 } },
+      actions.imageSetWhitePoint(10),
+    );
+
+    expect(clampedBlack.image.blackPoint).toBe(99);
+    expect(clampedWhite.image.whitePoint).toBe(91);
+  });
+
   it('stores and clears UI status messages', () => {
     const withMessage = reducer(initialAppState, actions.uiSetMessage('error', 'Bad input'));
 

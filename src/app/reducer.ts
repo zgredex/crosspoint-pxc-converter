@@ -7,20 +7,32 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
       return { ...state, loadedType: action.loadedType };
     case 'setDevice':
       return { ...state, device: getDeviceState(action.deviceKey) };
+    case 'setBackground':
+      return { ...state, background: action.background };
     case 'image/setMode':
       return { ...state, image: { ...state.image, mode: action.mode } };
     case 'image/setFitAlign':
       return { ...state, image: { ...state.image, fitAlign: action.fitAlign } };
-    case 'image/setFitBg':
-      return { ...state, image: { ...state.image, fitBg: action.fitBg } };
     case 'image/setContrast':
       return { ...state, image: { ...state.image, contrastValue: action.contrastValue } };
     case 'image/resetContrast':
       return { ...state, image: { ...state.image, contrastValue: initialImageState.contrastValue } };
     case 'image/setBlackPoint':
-      return { ...state, image: { ...state.image, blackPoint: action.blackPoint } };
+      return {
+        ...state,
+        image: {
+          ...state.image,
+          blackPoint: Math.max(0, Math.min(action.blackPoint, state.image.whitePoint - 1)),
+        },
+      };
     case 'image/setWhitePoint':
-      return { ...state, image: { ...state.image, whitePoint: action.whitePoint } };
+      return {
+        ...state,
+        image: {
+          ...state.image,
+          whitePoint: Math.min(255, Math.max(action.whitePoint, state.image.blackPoint + 1)),
+        },
+      };
     case 'image/resetTone':
       return {
         ...state,

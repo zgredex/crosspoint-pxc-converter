@@ -18,7 +18,6 @@ export type DeviceState = {
 export type ImageState = {
   mode: 'crop' | 'fit';
   fitAlign: FitAlign;
-  fitBg: FitBackground;
   contrastValue: number;
   blackPoint: number;
   whitePoint: number;
@@ -43,6 +42,7 @@ export type GbState = {
 export type AppState = {
   loadedType: LoadedType;
   device: DeviceState;
+  background: FitBackground;
   image: ImageState;
   gb: GbState;
   ui: {
@@ -64,7 +64,6 @@ function createDeviceState(key: DeviceKey): DeviceState {
 export const initialImageState: ImageState = {
   mode: 'crop',
   fitAlign: 'mc',
-  fitBg: 'white',
   contrastValue: 0,
   blackPoint: 0,
   whitePoint: 255,
@@ -89,6 +88,7 @@ export const initialGbState: GbState = {
 export const initialAppState: AppState = {
   loadedType: null,
   device: createDeviceState(DEFAULT_XT),
+  background: 'white',
   image: initialImageState,
   gb: initialGbState,
   ui: {

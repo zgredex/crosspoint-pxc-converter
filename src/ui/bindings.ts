@@ -1,31 +1,26 @@
 import { actions } from '../app/actions';
+import type { AppController } from '../app/appController';
 import type { AppStore } from '../app/store';
 import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
-import type { FitAlign } from '../domain/geometry';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
+import type { FitAlign } from '../domain/geometry';
 import type { FitBackground } from '../app/state';
 import type { AppDom } from './dom';
 
 type BindingDeps = {
   store: AppStore;
+  appController: Pick<AppController, 'setBackground' | 'setDevice' | 'setGbInvert' | 'setGbPalette' | 'setImageMode'>;
   scheduleConvert: (delay: number) => void;
-  rebuildGammaLUT: () => void;
   autoLevels: () => void | Promise<void>;
-  onDeviceChanged: () => void;
-  onImageLayoutChanged: () => void;
-  onGbVisualChanged: () => void;
 };
 
 export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
   const {
     store,
+    appController,
     scheduleConvert,
-    rebuildGammaLUT,
     autoLevels,
-    onDeviceChanged,
-    onImageLayoutChanged,
-    onGbVisualChanged,
   } = deps;
 
   dom.invertToggle.addEventListener('change', () => {
@@ -49,24 +44,17 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
   });
 
   dom.blackSlider.addEventListener('input', () => {
-    const state = store.getState();
-    let nextBlackPoint = parseInt(dom.blackSlider.value);
-    if (nextBlackPoint >= state.image.whitePoint) nextBlackPoint = state.image.whitePoint - 1;
-    store.dispatch(actions.imageSetBlackPoint(nextBlackPoint));
+    store.dispatch(actions.imageSetBlackPoint(parseInt(dom.blackSlider.value)));
     scheduleConvert(50);
   });
 
   dom.whiteSlider.addEventListener('input', () => {
-    const state = store.getState();
-    let nextWhitePoint = parseInt(dom.whiteSlider.value);
-    if (nextWhitePoint <= state.image.blackPoint) nextWhitePoint = state.image.blackPoint + 1;
-    store.dispatch(actions.imageSetWhitePoint(nextWhitePoint));
+    store.dispatch(actions.imageSetWhitePoint(parseInt(dom.whiteSlider.value)));
     scheduleConvert(50);
   });
 
   dom.toneReset.addEventListener('click', () => {
     store.dispatch(actions.imageResetTone());
-    rebuildGammaLUT();
     scheduleConvert(0);
   });
 
@@ -78,7 +66,6 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     let nextGammaValue = parseInt(dom.gammaSlider.value) / 100;
     if (nextGammaValue < 0.01) nextGammaValue = 0.01;
     store.dispatch(actions.imageSetGamma(nextGammaValue));
-    rebuildGammaLUT();
     scheduleConvert(50);
   });
 
@@ -86,8 +73,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const deviceKey = button.dataset.xt;
       if (!deviceKey) return;
-      store.dispatch(actions.setDevice(deviceKey as DeviceKey));
-      onDeviceChanged();
+      appController.setDevice(deviceKey as DeviceKey);
     });
   }
 
@@ -95,8 +81,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const mode = button.dataset.mode;
       if (!mode) return;
-      store.dispatch(actions.imageSetMode(mode as 'crop' | 'fit'));
-      onImageLayoutChanged();
+      appController.setImageMode(mode as 'crop' | 'fit');
     });
   }
 
@@ -120,10 +105,9 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
 
   for (const button of dom.bgButtons) {
     button.addEventListener('click', () => {
-      const fitBg = button.dataset.bg;
-      if (!fitBg) return;
-      store.dispatch(actions.imageSetFitBg(fitBg as FitBackground));
-      scheduleConvert(0);
+      const background = button.dataset.bg;
+      if (!background) return;
+      appController.setBackground(background as FitBackground);
     });
   }
 
@@ -131,13 +115,11 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const paletteKey = button.dataset.gbpalette;
       if (!paletteKey) return;
-      store.dispatch(actions.gbSetPalette(paletteKey as GbPaletteKey));
-      onGbVisualChanged();
+      appController.setGbPalette(paletteKey as GbPaletteKey);
     });
   }
 
   dom.gbInvertToggle.addEventListener('change', () => {
-    store.dispatch(actions.gbSetInvert(dom.gbInvertToggle.checked));
-    onGbVisualChanged();
+    appController.setGbInvert(dom.gbInvertToggle.checked);
   });
 }

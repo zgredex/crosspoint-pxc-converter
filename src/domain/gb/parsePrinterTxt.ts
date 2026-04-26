@@ -1,7 +1,7 @@
-export function parsePrinterTxt(text: string): { bytes: Uint8Array; palletShades: number[] | null } {
+export function parsePrinterTxt(text: string): { bytes: Uint8Array; paletteShades: number[] | null } {
   const lines = text.split('\n');
   const allBytes: number[] = [];
-  let palletShades: number[] | null = null;
+  let paletteShades: number[] | null = null;
 
   for (const raw of lines) {
     const line = raw.trim();
@@ -12,7 +12,7 @@ export function parsePrinterTxt(text: string): { bytes: Uint8Array; palletShades
         const cmd = JSON.parse(line) as { command?: string; pallet?: number };
         if (cmd.command === 'PRNT' && cmd.pallet !== undefined) {
           const reg = cmd.pallet & 0xff;
-          palletShades = [
+          paletteShades = [
             (reg >> 0) & 3,
             (reg >> 2) & 3,
             (reg >> 4) & 3,
@@ -20,7 +20,7 @@ export function parsePrinterTxt(text: string): { bytes: Uint8Array; palletShades
           ];
         }
       } catch {
-        // Ignore malformed JSON command lines to preserve current behavior.
+        // Preserve permissive parsing because printer logs can mix binary dumps with malformed command lines.
       }
       continue;
     }
@@ -30,5 +30,5 @@ export function parsePrinterTxt(text: string): { bytes: Uint8Array; palletShades
     }
   }
 
-  return { bytes: new Uint8Array(allBytes), palletShades };
+  return { bytes: new Uint8Array(allBytes), paletteShades };
 }

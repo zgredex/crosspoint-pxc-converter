@@ -1,8 +1,9 @@
 import type { AppStore } from '../../app/store';
 import type { AppDom } from '../../ui/dom';
 import type { ImageRuntime } from '../../app/runtime/imageRuntime';
-import type { OutputRuntime } from '../../app/runtime/outputRuntime';
+import { clearOutputBytes, setOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
+import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import type { PicaResizer } from '../../infra/canvas/picaResize';
 import { buildImageRenderPlan, getImageAnalysisRegion } from '../../domain/geometry';
 import { buildUintHistogram } from '../../domain/histogram';
@@ -40,20 +41,11 @@ type ImageControllerDeps = {
   showError: (message: string) => void;
   clearHistogramView: () => void;
   clearSnap: () => void;
+  syncUi: () => void;
 };
 
-function getContext2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('2D canvas context is unavailable');
-  return context;
-}
-
-function createCanvas(width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
+const MAX_EDITOR_WIDTH = 340;
+const MAX_EDITOR_HEIGHT = 520;
 
 export function createImageController(deps: ImageControllerDeps): ImageController {
   function getState() {
@@ -63,6 +55,16 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   function rebuildGammaLut(): void {
     deps.runtime.gammaLut = buildGammaLut(getState().image.gammaValue);
   }
+
+  let lastGammaValue = getState().image.gammaValue;
+  rebuildGammaLut();
+  deps.store.subscribe(() => {
+    const nextGammaValue = getState().image.gammaValue;
+    if (nextGammaValue !== lastGammaValue) {
+      lastGammaValue = nextGammaValue;
+      rebuildGammaLut();
+    }
+  });
 
   function requestConvert(delay: number): void {
     if (deps.runtime.convertTimer !== null) clearTimeout(deps.runtime.convertTimer);
@@ -107,8 +109,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.runtime.loadedImg = null;
     }
 
-    deps.output.pxcBytes = null;
-    deps.output.bmpBytes = null;
+    clearOutputBytes(deps.output);
     deps.output.outputBaseName = 'sleep';
 
     deps.dom.sourceCanvas.width = 1;
@@ -125,11 +126,10 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.runtime.rotatedSrc = null;
     }
 
-    rebuildGammaLut();
     deps.clearSnap();
 
     deps.clearHistogramView();
-    deps.dom.downloadGroup.classList.remove('visible');
+    deps.syncUi();
   }
 
   async function loadImageFile(file: File): Promise<void> {
@@ -156,7 +156,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     const sourceWidth = srcW(src);
     const sourceHeight = srcH(src);
 
-    const baseScale = Math.min(340 / sourceWidth, 520 / sourceHeight);
+    const baseScale = Math.min(MAX_EDITOR_WIDTH / sourceWidth, MAX_EDITOR_HEIGHT / sourceHeight);
     deps.runtime.displayScale = Math.min(baseScale * state.image.editorZoom, 1.0);
     deps.runtime.dispImgW = Math.round(sourceWidth * deps.runtime.displayScale);
     deps.runtime.dispImgH = Math.round(sourceHeight * deps.runtime.displayScale);
@@ -180,8 +180,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.dom.sourceCanvas.width = deps.runtime.dispImgW;
     deps.dom.sourceCanvas.height = deps.runtime.dispImgH;
     await resizeWithPica(deps.pica, src, deps.dom.sourceCanvas);
-    deps.dom.sourceFrame.style.width = `${Math.min(deps.runtime.dispImgW, 340)}px`;
-    deps.dom.sourceFrame.style.height = `${Math.min(deps.runtime.dispImgH, 520)}px`;
+    deps.dom.sourceFrame.style.width = `${Math.min(deps.runtime.dispImgW, MAX_EDITOR_WIDTH)}px`;
+    deps.dom.sourceFrame.style.height = `${Math.min(deps.runtime.dispImgH, MAX_EDITOR_HEIGHT)}px`;
 
     if (state.image.mode === 'crop') {
       deps.clearSnap();
@@ -219,7 +219,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       src,
       targetCanvas: tempCanvas,
       plan,
-      fitBg: state.image.fitBg,
+      fitBg: state.background,
       pica: deps.pica,
     });
     if (gen !== deps.runtime.autoLevelsGen) return;
@@ -231,7 +231,6 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.store.dispatch({ type: 'image/setBlackPoint', blackPoint: levels.blackPoint });
     deps.store.dispatch({ type: 'image/setWhitePoint', whitePoint: levels.whitePoint });
     deps.store.dispatch({ type: 'image/setGamma', gammaValue: 1.0 });
-    rebuildGammaLut();
     requestConvert(0);
   }
 
@@ -260,7 +259,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       src,
       targetCanvas: deps.dom.workCanvas,
       plan,
-      fitBg: state.image.fitBg,
+      fitBg: state.background,
       pica: deps.pica,
     });
     if (gen !== deps.runtime.convertGen) return;
@@ -284,9 +283,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.runtime.lastHistogram = outputs.histogram;
     drawHistogram();
     renderIndexedPreview(deps.dom.previewCanvas, outputs.indexedPixels, state.device.targetW, state.device.targetH);
-    deps.output.pxcBytes = outputs.pxcBytes;
-    deps.output.bmpBytes = outputs.bmpBytes;
-    deps.dom.downloadGroup.classList.add('visible');
+    setOutputBytes(deps.output, outputs.pxcBytes, outputs.bmpBytes);
+    deps.syncUi();
   }
 
   async function refreshTransformedSource(): Promise<void> {

@@ -66,8 +66,8 @@ export function createDom() {
     gbInfoDims: requiredElement<HTMLElement>('gbInfoDims'),
     gbWarnRow: requiredElement<HTMLDivElement>('gbWarnRow'),
     gbWarnMsg: requiredElement<HTMLElement>('gbWarnMsg'),
-    palletInfo: requiredElement<HTMLDivElement>('palletInfo'),
-    palletInfoVal: requiredElement<HTMLElement>('palletInfoVal'),
+    paletteInfo: requiredElement<HTMLDivElement>('paletteInfo'),
+    paletteInfoVal: requiredElement<HTMLElement>('paletteInfoVal'),
     gbScaleUpBtn: requiredElement<HTMLButtonElement>('gbScaleUpBtn'),
     gbScaleDownBtn: requiredElement<HTMLButtonElement>('gbScaleDownBtn'),
     gbScaleVal: requiredElement<HTMLSpanElement>('gbScaleVal'),
@@ -84,5 +84,3 @@ export function createDom() {
 }
 
 export type AppDom = ReturnType<typeof createDom>;
-
-export const dom = createDom();

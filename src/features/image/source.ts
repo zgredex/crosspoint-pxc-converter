@@ -1,20 +1,8 @@
 import type { Rotation } from '../../app/state';
 import type { ImageRuntime } from '../../app/runtime/imageRuntime';
+import { createCanvas, getContext2d } from '../../infra/canvas/context';
 
 export type SourceImage = HTMLImageElement | HTMLCanvasElement;
-
-function getContext2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('2D canvas context is unavailable');
-  return context;
-}
-
-function createCanvas(width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
 
 export function buildRotatedSource(
   runtime: ImageRuntime,

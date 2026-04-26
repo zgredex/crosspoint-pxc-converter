@@ -7,9 +7,9 @@ import type { FitBackground, LoadedType, Rotation, UiTone } from './state';
 export type AppAction =
   | { type: 'setLoadedType'; loadedType: LoadedType }
   | { type: 'setDevice'; deviceKey: DeviceKey }
+  | { type: 'setBackground'; background: FitBackground }
   | { type: 'image/setMode'; mode: 'crop' | 'fit' }
   | { type: 'image/setFitAlign'; fitAlign: FitAlign }
-  | { type: 'image/setFitBg'; fitBg: FitBackground }
   | { type: 'image/setContrast'; contrastValue: number }
   | { type: 'image/resetContrast' }
   | { type: 'image/setBlackPoint'; blackPoint: number }
@@ -36,9 +36,9 @@ export type AppAction =
 export const actions = {
   setLoadedType: (loadedType: LoadedType): AppAction => ({ type: 'setLoadedType', loadedType }),
   setDevice: (deviceKey: DeviceKey): AppAction => ({ type: 'setDevice', deviceKey }),
+  setBackground: (background: FitBackground): AppAction => ({ type: 'setBackground', background }),
   imageSetMode: (mode: 'crop' | 'fit'): AppAction => ({ type: 'image/setMode', mode }),
   imageSetFitAlign: (fitAlign: FitAlign): AppAction => ({ type: 'image/setFitAlign', fitAlign }),
-  imageSetFitBg: (fitBg: FitBackground): AppAction => ({ type: 'image/setFitBg', fitBg }),
   imageSetContrast: (contrastValue: number): AppAction => ({ type: 'image/setContrast', contrastValue }),
   imageResetContrast: (): AppAction => ({ type: 'image/resetContrast' }),
   imageSetBlackPoint: (blackPoint: number): AppAction => ({ type: 'image/setBlackPoint', blackPoint }),

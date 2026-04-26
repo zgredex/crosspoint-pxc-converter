@@ -1,5 +1,19 @@
 import type { AppState } from '../app/state';
+import { hasOutput, type OutputRuntime } from '../app/runtime/outputRuntime';
+import type { GbRuntime } from '../app/runtime/gbRuntime';
+import { buildGbFileInfo } from '../features/gb/service';
 import type { AppDom } from './dom';
+
+type RenderRuntimeState = {
+  output: OutputRuntime;
+  gbRuntime: GbRuntime;
+};
+
+function getPanelSection(element: Element): HTMLElement {
+  const section = element.closest('.panel-section');
+  if (!(section instanceof HTMLElement)) throw new Error('Expected panel section element');
+  return section;
+}
 
 function setActive(buttons: HTMLButtonElement[], predicate: (button: HTMLButtonElement) => boolean): void {
   for (const button of buttons) {
@@ -7,20 +21,45 @@ function setActive(buttons: HTMLButtonElement[], predicate: (button: HTMLButtonE
   }
 }
 
-export function renderStoreState(dom: AppDom, state: AppState): void {
+export function renderStoreState(dom: AppDom, state: AppState, runtime: RenderRuntimeState): void {
+  const isGbLoaded = state.loadedType === 'gb';
+  const outputVisible = hasOutput(runtime.output);
+  const fileInfo = isGbLoaded && runtime.gbRuntime.rawBytes
+    ? buildGbFileInfo({
+        name: runtime.output.outputBaseName,
+        rawByteLength: runtime.gbRuntime.rawBytes.length,
+        tilesWide: 20,
+        paletteRemap: runtime.gbRuntime.paletteRemap,
+      })
+    : null;
+
   dom.statusBanner.hidden = state.ui.message === null;
   dom.statusBanner.textContent = state.ui.message ?? '';
   dom.statusBanner.className = state.ui.tone ? `status-banner ${state.ui.tone}` : 'status-banner';
 
   dom.dropZone.style.display = state.loadedType === null ? '' : 'none';
   dom.editorSection.classList.toggle('visible', state.loadedType !== null);
+  dom.gbSourceWrap.style.display = isGbLoaded ? '' : 'none';
+  dom.sourceFrame.style.display = isGbLoaded ? 'none' : '';
+  dom.gbFileInfo.classList.toggle('visible', isGbLoaded);
+  dom.scaleSection.style.display = isGbLoaded ? 'none' : '';
+  dom.mirrorSection.style.display = isGbLoaded ? 'none' : '';
+  dom.posSection.style.display = isGbLoaded ? 'none' : '';
+  dom.histogramSection.style.display = isGbLoaded ? 'none' : '';
+  dom.toneRangeSection.style.display = isGbLoaded ? 'none' : '';
+  getPanelSection(dom.contrastReset).style.display = isGbLoaded ? 'none' : '';
+  getPanelSection(dom.ditherToggle).style.display = isGbLoaded ? 'none' : '';
+  getPanelSection(dom.invertToggle).style.display = isGbLoaded ? 'none' : '';
+  dom.gbControls.style.display = isGbLoaded ? '' : 'none';
+  dom.downloadGroup.classList.toggle('visible', outputVisible);
+  if (!outputVisible) dom.zoomBox.style.display = 'none';
   dom.previewCanvas.style.aspectRatio = `${state.device.targetW} / ${state.device.targetH}`;
 
   setActive(dom.deviceButtons, button => button.dataset.xt === state.device.key);
   setActive(dom.modeButtons, button => button.dataset.mode === state.image.mode);
   setActive(dom.ditherButtons, button => button.dataset.dither === state.image.ditherMode);
   setActive(dom.posButtons, button => button.dataset.pos === state.image.fitAlign);
-  setActive(dom.bgButtons, button => button.dataset.bg === state.image.fitBg);
+  setActive(dom.bgButtons, button => button.dataset.bg === state.background);
   setActive(dom.gbPaletteButtons, button => button.dataset.gbpalette === state.gb.paletteKey);
 
   dom.posSection.classList.toggle('disabled', state.image.mode === 'crop');
@@ -30,6 +69,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.invertToggle.checked = state.image.invert;
   dom.ditherToggle.checked = state.image.ditherEnabled;
   dom.ditherAlgos.classList.toggle('disabled', !state.image.ditherEnabled);
+  for (const button of dom.ditherButtons) button.disabled = !state.image.ditherEnabled;
 
   dom.contrastSlider.value = String(state.image.contrastValue);
   dom.contrastValEl.textContent = `${state.image.contrastValue > 0 ? '+' : ''}${state.image.contrastValue}`;
@@ -41,6 +81,14 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.gammaValEl.textContent = state.image.gammaValue.toFixed(2);
   dom.gbScaleVal.textContent = `${state.gb.outputScale}×`;
   dom.gbInvertToggle.checked = state.gb.invert;
+  dom.gbInfoName.textContent = fileInfo?.name ?? '—';
+  dom.gbInfoSize.textContent = fileInfo?.sizeText ?? '—';
+  dom.gbInfoTiles.textContent = fileInfo?.tilesText ?? '—';
+  dom.gbInfoDims.textContent = fileInfo?.dimsText ?? '—';
+  dom.gbWarnRow.style.display = fileInfo?.warningText ? '' : 'none';
+  dom.gbWarnMsg.textContent = fileInfo?.warningText ?? '';
+  dom.paletteInfoVal.textContent = fileInfo?.paletteInfoText ?? '—';
+  dom.paletteInfo.style.display = fileInfo?.paletteInfoText ? '' : 'none';
 
   dom.sourceLabel.textContent = state.loadedType === 'gb'
     ? 'GB — native palette'
@@ -54,5 +102,6 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     dom.zoomLabelEl.textContent = `${state.image.editorZoom}×`;
   } else {
     dom.rotateValEl.textContent = `${state.gb.rotation}°`;
+    dom.zoomLabelEl.textContent = `${runtime.gbRuntime.renderedScale}×`;
   }
 }

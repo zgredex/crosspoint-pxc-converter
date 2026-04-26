@@ -1,9 +1,11 @@
 import { buildBinnedHistogram, computeHistogramZones } from '../../domain/histogram';
+import { getContext2d } from './context';
 
-function getContext2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('2D canvas context is unavailable');
-  return context;
+export function clearHistogram(canvas: HTMLCanvasElement, runtime: { lastHistogram: Float32Array | null }): void {
+  runtime.lastHistogram = null;
+  if (canvas.width) {
+    getContext2d(canvas).clearRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 export function resizeHistogramCanvas(canvas: HTMLCanvasElement): void {
@@ -17,6 +19,17 @@ export function resizeHistogramCanvas(canvas: HTMLCanvasElement): void {
 
   canvas.width = nextWidth;
   canvas.height = nextHeight;
+}
+
+export function mountHistogramAutoResize(params: {
+  canvas: HTMLCanvasElement;
+  getHistogram: () => Float32Array | null;
+  getTotalPixels: () => number;
+}): void {
+  window.addEventListener('resize', () => {
+    resizeHistogramCanvas(params.canvas);
+    renderHistogram(params.canvas, params.getHistogram(), params.getTotalPixels());
+  });
 }
 
 export function renderHistogram(

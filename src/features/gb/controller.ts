@@ -1,16 +1,16 @@
 import type { AppStore } from '../../app/store';
 import type { AppDom } from '../../ui/dom';
 import type { GbRuntime } from '../../app/runtime/gbRuntime';
-import type { OutputRuntime } from '../../app/runtime/outputRuntime';
+import { clearOutputBytes, setOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
 import { decode2bpp } from '../../domain/gb/decode2bpp';
 import { parsePrinterTxt } from '../../domain/gb/parsePrinterTxt';
 import { rotatePixels } from '../../domain/gb/rotatePixels';
 import { readFileAsArrayBuffer, readFileAsText } from '../../infra/browser/imageLoader';
+import { getContext2d } from '../../infra/canvas/context';
 import { renderGbSourceCanvas } from '../../infra/canvas/gbSourceRenderer';
 import { renderIndexedPreview } from '../../infra/canvas/previewRenderer';
-import { buildGbFileInfo, buildGbOutputArtifacts, buildGbSourceView } from './service';
-import { showGbUI, showImageUI } from '../../ui/modeView';
+import { buildGbOutputArtifacts, buildGbSourceView } from './service';
 
 export type GbController = {
   loadBinaryFile(file: File): Promise<void>;
@@ -36,13 +36,8 @@ type GbControllerDeps = {
   showError: (message: string) => void;
   clearHistogramView: () => void;
   validateGbBytes: (bytes: Uint8Array, sourceLabel: string) => void;
+  syncUi: () => void;
 };
-
-function getContext2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('2D canvas context is unavailable');
-  return context;
-}
 
 const TILES_WIDE = 20;
 
@@ -59,32 +54,12 @@ export function createGbController(deps: GbControllerDeps): GbController {
     deps.runtime.pixels = null;
     deps.runtime.paletteRemap = null;
     deps.store.dispatch({ type: 'gb/resetAll' });
-    showImageUI(deps.dom);
     deps.store.dispatch({ type: 'setLoadedType', loadedType: null });
     getContext2d(deps.dom.previewCanvas).clearRect(0, 0, getState().device.targetW, getState().device.targetH);
-    deps.dom.downloadGroup.classList.remove('visible');
     deps.dom.fileInput.value = '';
-    deps.output.pxcBytes = null;
-    deps.output.bmpBytes = null;
-  }
-
-  function updateFileInfo(): void {
-    if (deps.runtime.rawBytes === null) throw new Error('GB bytes are not loaded');
-    const info = buildGbFileInfo({
-      name: deps.output.outputBaseName,
-      rawByteLength: deps.runtime.rawBytes.length,
-      tilesWide: TILES_WIDE,
-      paletteRemap: deps.runtime.paletteRemap,
-    });
-
-    deps.dom.gbInfoName.textContent = info.name;
-    deps.dom.gbInfoSize.textContent = info.sizeText;
-    deps.dom.gbInfoTiles.textContent = info.tilesText;
-    deps.dom.gbInfoDims.textContent = info.dimsText;
-    deps.dom.gbWarnRow.style.display = info.warningText ? '' : 'none';
-    deps.dom.gbWarnMsg.textContent = info.warningText ?? '';
-    deps.dom.palletInfoVal.textContent = info.paletteInfoText ?? '';
-    deps.dom.palletInfo.style.display = info.paletteInfoText ? '' : 'none';
+    clearOutputBytes(deps.output);
+    deps.output.outputBaseName = 'sleep';
+    deps.syncUi();
   }
 
   function drawGbSource(): void {
@@ -92,7 +67,6 @@ export function createGbController(deps: GbControllerDeps): GbController {
     const state = getState();
     const view = buildGbSourceView(deps.runtime.pixels, deps.runtime.width, deps.runtime.height, state.gb.rotation, state.gb.zoom);
     deps.runtime.renderedScale = view.displayScale;
-    deps.dom.zoomLabelEl.textContent = `${view.displayScale}×`;
     renderGbSourceCanvas(
       deps.dom.gbCanvas,
       view.pixels,
@@ -103,6 +77,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
       deps.runtime.paletteRemap,
       state.gb.invert,
     );
+    deps.syncUi();
   }
 
   function buildOutput(): void {
@@ -116,17 +91,16 @@ export function createGbController(deps: GbControllerDeps): GbController {
       outputScale: state.gb.outputScale,
       targetW: state.device.targetW,
       targetH: state.device.targetH,
-      background: state.image.fitBg,
+      background: state.background,
       paletteRemap: deps.runtime.paletteRemap,
       invert: state.gb.invert,
       paletteKey: state.gb.paletteKey,
     });
 
     renderIndexedPreview(deps.dom.previewCanvas, outputs.indexedPixels, state.device.targetW, state.device.targetH);
-    deps.output.pxcBytes = outputs.pxcBytes;
-    deps.output.bmpBytes = outputs.bmpBytes;
-    deps.dom.downloadGroup.classList.add('visible');
+    setOutputBytes(deps.output, outputs.pxcBytes, outputs.bmpBytes);
     deps.clearHistogramView();
+    deps.syncUi();
   }
 
   function decodeGbDraw(): void {
@@ -135,14 +109,12 @@ export function createGbController(deps: GbControllerDeps): GbController {
     deps.runtime.pixels = pixels;
     deps.runtime.width = w;
     deps.runtime.height = h;
-    updateFileInfo();
     drawGbSource();
   }
 
   function initGb(): void {
     decodeGbDraw();
     buildOutput();
-    showGbUI(deps.dom, deps.clearHistogramView);
   }
 
   async function loadBinaryFile(file: File): Promise<void> {
@@ -170,7 +142,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
       const parsed = parsePrinterTxt(text);
       deps.validateGbBytes(parsed.bytes, outputBaseName === 'pasted-printer-log' ? 'Pasted GB Printer text' : 'GB Printer text log');
       deps.runtime.rawBytes = parsed.bytes;
-      deps.runtime.paletteRemap = parsed.palletShades;
+      deps.runtime.paletteRemap = parsed.paletteShades;
       initGb();
     } catch (error) {
       unloadGb();

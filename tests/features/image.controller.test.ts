@@ -40,6 +40,7 @@ describe('image controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
+      syncUi: vi.fn(),
     });
 
     controller.setRotation(90);
@@ -64,6 +65,7 @@ describe('image controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
+      syncUi: vi.fn(),
     });
 
     controller.setZoom(2);
@@ -89,6 +91,7 @@ describe('image controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
+      syncUi: vi.fn(),
     });
 
     controller.rebuildGammaLut();
@@ -114,6 +117,7 @@ describe('image controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
+      syncUi: vi.fn(),
     });
 
     controller.requestConvert(50);

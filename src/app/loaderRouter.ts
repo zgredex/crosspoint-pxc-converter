@@ -10,20 +10,20 @@ type LoaderRouterDeps = {
 export function createLoaderRouter(deps: LoaderRouterDeps) {
   return {
     async loadFile(file: File): Promise<void> {
-      const name = file.name.toLowerCase();
-      const isGb = /\.(2bpp|bin|gb|txt)$/i.test(name);
+      const extension = /\.([^.]+)$/i.exec(file.name)?.[1]?.toLowerCase();
 
-      if (isGb) {
-        if (/\.txt$/i.test(name)) {
+      switch (extension) {
+        case 'txt':
           await deps.gbController.loadPrinterText(await readFileAsText(file), file.name.replace(/\.[^.]+$/, ''));
           return;
-        }
-
-        await deps.gbController.loadBinaryFile(file);
-        return;
+        case '2bpp':
+        case 'bin':
+        case 'gb':
+          await deps.gbController.loadBinaryFile(file);
+          return;
+        default:
+          await deps.imageController.loadImageFile(file);
       }
-
-      await deps.imageController.loadImageFile(file);
     },
   };
 }

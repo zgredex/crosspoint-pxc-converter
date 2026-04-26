@@ -5,6 +5,7 @@ import { encodeGrayBmp } from '../../domain/formats/bmpGray';
 import { encodePxc } from '../../domain/formats/pxc';
 import type { ImageRenderPlan } from '../../domain/geometry';
 import { buildHistogram } from '../../domain/histogram';
+import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import {
   applyBlackWhitePoints,
   applyContrast,
@@ -15,19 +16,6 @@ import {
 import { resizeWithPica, type PicaResizer } from '../../infra/canvas/picaResize';
 
 type SourceImage = HTMLImageElement | HTMLCanvasElement;
-
-function getContext2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('2D canvas context is unavailable');
-  return context;
-}
-
-function createCanvas(width: number, height: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  return canvas;
-}
 
 export type ImageProcessingSettings = {
   blackPoint: number;

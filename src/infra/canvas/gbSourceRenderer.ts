@@ -1,11 +1,6 @@
 import type { GbPaletteKey } from '../../domain/formats/bmpGb';
 import { GB_PALETTES } from '../../domain/formats/bmpGb';
-
-function getContext2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('2D canvas context is unavailable');
-  return context;
-}
+import { getContext2d } from './context';
 
 export function renderGbSourceCanvas(
   canvas: HTMLCanvasElement,

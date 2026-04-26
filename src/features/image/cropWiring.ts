@@ -1,0 +1,43 @@
+import type { AppStore } from '../../app/store';
+import type { AppDom } from '../../ui/dom';
+import { setupCropInteraction } from '../../ui/cropInteraction';
+import type { ImageRuntime } from '../../app/runtime/imageRuntime';
+import { applyCropBoxToDom } from './cropBox';
+
+const SNAP_THRESHOLD = 9;
+
+type CropWiringDeps = {
+  store: AppStore;
+  dom: AppDom;
+  runtime: ImageRuntime;
+  scheduleConvert: (delay: number) => void;
+};
+
+export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: () => void } {
+  return setupCropInteraction({
+    cropBox: deps.dom.cropBox,
+    sourceCanvas: deps.dom.sourceCanvas,
+    snapGuideH: deps.dom.snapGuideH,
+    snapGuideV: deps.dom.snapGuideV,
+    snapThreshold: SNAP_THRESHOLD,
+    getMode: () => deps.store.getState().image.mode,
+    getBoxState: () => ({
+      dispImgW: deps.runtime.dispImgW,
+      dispImgH: deps.runtime.dispImgH,
+      boxW: deps.runtime.boxW,
+      boxH: deps.runtime.boxH,
+      boxX: deps.runtime.boxX,
+      boxY: deps.runtime.boxY,
+    }),
+    setBoxPosition: (x, y) => {
+      deps.runtime.boxX = x;
+      deps.runtime.boxY = y;
+    },
+    applyCropBox: () => applyCropBoxToDom({
+      runtime: deps.runtime,
+      cropBox: deps.dom.cropBox,
+      sourceFrame: deps.dom.sourceFrame,
+    }),
+    scheduleConvert: deps.scheduleConvert,
+  });
+}
