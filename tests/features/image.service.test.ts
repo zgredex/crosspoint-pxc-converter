@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildGammaLut, buildLuminanceBuffer } from '../../src/domain/tone';
+import { buildLuminanceBuffer } from '../../src/domain/tone';
 import { ditherToIndexedGray } from '../../src/domain/dither';
 import { buildHistogram } from '../../src/domain/histogram';
 import { encodePxc } from '../../src/domain/formats/pxc';

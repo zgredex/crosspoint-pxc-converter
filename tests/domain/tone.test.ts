@@ -1,28 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  applyBlackWhitePoints,
-  applyContrast,
-  applyGamma,
-  applyInvert,
-  buildGammaLut,
   buildLuminanceBuffer,
   buildToneLut,
   computeAutoLevels,
   lum,
 } from '../../src/domain/tone';
 
+const defaultSettings = {
+  blackPoint: 0,
+  whitePoint: 255,
+  gammaValue: 1.0,
+  contrastValue: 0,
+  invert: false,
+};
+
 describe('tone', () => {
   it('computes BT.601 luminance', () => {
     expect(lum(255, 255, 255)).toBe(255);
     expect(lum(0, 0, 0)).toBe(0);
-  });
-
-  it('builds a gamma LUT with correct endpoints', () => {
-    const lut = buildGammaLut(1);
-    expect(lut[0]).toBe(0);
-    expect(lut[255]).toBe(255);
-    expect(lut[128]).toBeCloseTo(128, 4);
   });
 
   it('builds luminance values from rgba data', () => {
@@ -33,43 +29,49 @@ describe('tone', () => {
     expect(values[1]).toBe(0);
   });
 
-  it('applies black and white points', () => {
-    const values = new Float32Array([50, 100, 150]);
-    const mapped = applyBlackWhitePoints(values, 50, 150);
-    expect(Array.from(mapped)).toEqual([0, 127.5, 255]);
+  it('buildToneLut is identity at default settings', () => {
+    const lut = buildToneLut(defaultSettings);
+    for (let i = 0; i < 256; i++) {
+      expect(lut[i]).toBeCloseTo(i, 5);
+    }
   });
 
-  it('applies gamma through the LUT', () => {
-    const values = new Float32Array([128]);
-    const mapped = applyGamma(values, buildGammaLut(2), 2);
-    expect(mapped[0]).toBeGreaterThan(128);
+  it('buildToneLut remaps black and white points', () => {
+    const lut = buildToneLut({ ...defaultSettings, blackPoint: 50, whitePoint: 150 });
+    expect(lut[50]).toBeCloseTo(0, 5);
+    expect(lut[100]).toBeCloseTo(127.5, 5);
+    expect(lut[150]).toBeCloseTo(255, 5);
+    expect(lut[40]).toBe(0);
+    expect(lut[200]).toBe(255);
   });
 
-  it('applies contrast and inversion', () => {
-    const contrasted = applyContrast(new Float32Array([100]), 50);
-    expect(contrasted[0]).toBeLessThan(100);
-
-    const inverted = applyInvert(new Float32Array([0, 255]));
-    expect(Array.from(inverted)).toEqual([255, 0]);
+  it('buildToneLut applies gamma', () => {
+    const lut = buildToneLut({ ...defaultSettings, gammaValue: 2 });
+    expect(lut[128]).toBeGreaterThan(128);
+    expect(lut[0]).toBeCloseTo(0, 5);
+    expect(lut[255]).toBeCloseTo(255, 5);
   });
 
-  it('buildToneLut matches the chained pipeline at integer luminance', () => {
-    const cases = [
-      { blackPoint: 30, whitePoint: 220, gammaValue: 2.2, contrastValue: 25, invert: false },
-      { blackPoint: 0, whitePoint: 255, gammaValue: 1.0, contrastValue: 0, invert: true },
-      { blackPoint: 10, whitePoint: 200, gammaValue: 0.5, contrastValue: -40, invert: true },
-    ];
-    for (const settings of cases) {
-      const lut = buildToneLut(settings);
-      const gammaLut = buildGammaLut(settings.gammaValue);
-      for (let i = 0; i < 256; i++) {
-        const v0 = new Float32Array([i]);
-        applyBlackWhitePoints(v0, settings.blackPoint, settings.whitePoint);
-        applyGamma(v0, gammaLut, settings.gammaValue);
-        applyContrast(v0, settings.contrastValue);
-        if (settings.invert) applyInvert(v0);
-        expect(lut[i]).toBeCloseTo(v0[0], 3);
-      }
+  it('buildToneLut applies positive contrast', () => {
+    const lut = buildToneLut({ ...defaultSettings, contrastValue: 50 });
+    expect(lut[100]).toBeLessThan(100);
+    expect(lut[200]).toBeGreaterThan(200);
+  });
+
+  it('buildToneLut inverts', () => {
+    const lut = buildToneLut({ ...defaultSettings, invert: true });
+    expect(lut[0]).toBe(255);
+    expect(lut[255]).toBe(0);
+    expect(lut[128]).toBe(127);
+  });
+
+  it('buildToneLut clamps to [0, 255] under aggressive contrast', () => {
+    const lut = buildToneLut({ ...defaultSettings, contrastValue: 100 });
+    expect(lut[0]).toBe(0);
+    expect(lut[255]).toBe(255);
+    for (let i = 0; i < 256; i++) {
+      expect(lut[i]).toBeGreaterThanOrEqual(0);
+      expect(lut[i]).toBeLessThanOrEqual(255);
     }
   });
 

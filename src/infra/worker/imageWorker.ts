@@ -1,8 +1,6 @@
-import { ditherToIndexedGray } from '../../domain/dither';
+import { ditherToIndexedGray, type DitherMode } from '../../domain/dither';
 import { buildHistogram } from '../../domain/histogram';
 import { buildToneLut } from '../../domain/tone';
-
-export type DitherMode = 'fs' | 'atk' | 'jjn' | 'stucki' | 'burkes' | 'bayer' | 'zhou-fang' | 'blue-noise';
 
 export type WorkerSettings = {
   blackPoint: number;
