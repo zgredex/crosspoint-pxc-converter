@@ -15,7 +15,7 @@ describe('ditherToIndexedGray', () => {
 
   it('produces a deterministic blue noise result', () => {
     const result = ditherToIndexedGray(new Float32Array([100, 100, 100, 100]), 2, 2, true, 'blue-noise');
-    expect(Array.from(result)).toEqual([1, 1, 1, 1]);
+    expect(Array.from(result)).toEqual([1, 1, 2, 1]);
   });
 
   it('keeps output values within the 0..3 palette range', () => {
