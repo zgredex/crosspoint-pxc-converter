@@ -1,12 +1,6 @@
 import { ditherToIndexedGray } from '../../domain/dither';
 import { buildHistogram } from '../../domain/histogram';
-import {
-  buildLuminanceBuffer,
-  applyBlackWhitePoints,
-  applyGamma,
-  applyContrast,
-  applyInvert,
-} from '../../domain/tone';
+import { buildToneLut } from '../../domain/tone';
 
 export type DitherMode = 'fs' | 'atk' | 'jjn' | 'stucki' | 'burkes' | 'bayer' | 'zhou-fang' | 'blue-noise';
 
@@ -14,7 +8,6 @@ export type WorkerSettings = {
   blackPoint: number;
   whitePoint: number;
   gammaValue: number;
-  gammaLut: Float32Array | null;
   contrastValue: number;
   invert: boolean;
   ditherEnabled: boolean;
@@ -49,11 +42,15 @@ function processMessage(e: MessageEvent<WorkerInMessage>): void {
     if (!baseRaster) return;
 
     const { settings, version } = msg;
-    let buffer = buildLuminanceBuffer(baseRaster);
-    buffer = applyBlackWhitePoints(buffer, settings.blackPoint, settings.whitePoint);
-    buffer = applyGamma(buffer, settings.gammaLut, settings.gammaValue);
-    buffer = applyContrast(buffer, settings.contrastValue);
-    if (settings.invert) buffer = applyInvert(buffer);
+    const toneLut = buildToneLut(settings);
+    const totalPixels = baseRaster.length / 4;
+    const buffer = new Float32Array(totalPixels);
+    for (let i = 0; i < totalPixels; i++) {
+      const offset = i * 4;
+      const luminance = 0.299 * baseRaster[offset] + 0.587 * baseRaster[offset + 1] + 0.114 * baseRaster[offset + 2];
+      const idx = luminance < 0 ? 0 : luminance > 255 ? 255 : Math.round(luminance);
+      buffer[i] = toneLut[idx];
+    }
 
     const histogram = buildHistogram(buffer);
     const indexedPixels = ditherToIndexedGray(buffer, baseWidth, baseHeight, settings.ditherEnabled, settings.ditherMode);

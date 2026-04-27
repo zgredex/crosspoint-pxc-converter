@@ -1,21 +1,9 @@
 import type { FitBackground } from '../../app/state';
-import type { DitherMode } from '../../domain/dither';
 import type { ImageRenderPlan } from '../../domain/geometry';
 import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import { stepDownscaleAndResize, type PicaResizer } from '../../infra/canvas/picaResize';
 
 type SourceImage = HTMLImageElement | HTMLCanvasElement;
-
-export type ImageProcessingSettings = {
-  blackPoint: number;
-  whitePoint: number;
-  gammaValue: number;
-  gammaLut: Float32Array | null;
-  contrastValue: number;
-  invert: boolean;
-  ditherEnabled: boolean;
-  ditherMode: DitherMode;
-};
 
 export async function renderImageBaseRaster(params: {
   src: SourceImage;

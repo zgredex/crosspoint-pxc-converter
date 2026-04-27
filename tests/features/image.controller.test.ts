@@ -82,33 +82,6 @@ describe('image controller', () => {
     expect(store.actions).toContainEqual({ type: 'image/setEditorZoom', editorZoom: 2 });
   });
 
-  it('rebuilds gamma LUT on the runtime object', () => {
-    const runtime = createImageRuntime();
-    const controller = createImageController({
-      store: createMockStore({
-        ...initialAppState,
-        image: { ...initialAppState.image, gammaValue: 2 },
-      }),
-      dom: {
-        rotateValEl: { textContent: '' },
-        zoomLabelEl: { textContent: '' },
-      } as never,
-      runtime,
-      output: createOutputRuntime(),
-      pica: { resize: vi.fn() },
-      worker: createMockWorker(),
-      clearStatus: vi.fn(),
-      showError: vi.fn(),
-      clearHistogramView: vi.fn(),
-      clearSnap: vi.fn(),
-    });
-
-    controller.rebuildGammaLut();
-
-    expect(runtime.gammaLut).not.toBeNull();
-    expect(runtime.gammaLut?.[255]).toBe(255);
-  });
-
   it('cancels previous rAF before scheduling a new one', () => {
     const rafIds: number[] = [];
     let nextId = 0;

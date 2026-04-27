@@ -1,7 +1,6 @@
 export type ImageRuntime = {
   loadedImg: HTMLImageElement | null;
   rotatedSrc: HTMLCanvasElement | null;
-  gammaLut: Float32Array | null;
   displayScale: number;
   workScale: number;
   dispImgW: number;
@@ -23,7 +22,6 @@ export function createImageRuntime(): ImageRuntime {
   return {
     loadedImg: null,
     rotatedSrc: null,
-    gammaLut: null,
     displayScale: 1,
     workScale: 1,
     dispImgW: 0,

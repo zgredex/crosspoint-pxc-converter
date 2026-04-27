@@ -58,6 +58,49 @@ export function applyInvert(values: Float32Array): Float32Array {
   return values;
 }
 
+export function buildToneLut(settings: {
+  blackPoint: number;
+  whitePoint: number;
+  gammaValue: number;
+  contrastValue: number;
+  invert: boolean;
+}): Float32Array {
+  const { blackPoint, whitePoint, gammaValue, contrastValue, invert } = settings;
+  const lut = new Float32Array(256);
+
+  const bwActive = !(blackPoint <= 0 && whitePoint >= 255) && (whitePoint - blackPoint) > 0;
+  const bwRange = whitePoint - blackPoint;
+  const gammaActive = gammaValue !== 1.0;
+  const gammaInv = 1 / gammaValue;
+  const contrastActive = contrastValue !== 0;
+  const contrastFactor = contrastValue >= 0 ? 1 + contrastValue * 2 / 100 : 1 + contrastValue / 100;
+
+  for (let i = 0; i < 256; i++) {
+    let v = i;
+
+    if (bwActive) {
+      v = Math.max(0, Math.min(255, (v - blackPoint) / bwRange * 255));
+    }
+
+    if (gammaActive) {
+      const idx = Math.min(255, Math.max(0, Math.round(v)));
+      v = Math.pow(idx / 255, gammaInv) * 255;
+    }
+
+    if (contrastActive) {
+      v = Math.max(0, Math.min(255, (v - 127.5) * contrastFactor + 127.5));
+    }
+
+    if (invert) {
+      v = 255 - v;
+    }
+
+    lut[i] = v;
+  }
+
+  return lut;
+}
+
 export function computeAutoLevels(hist: Uint32Array, totalPixels: number): { blackPoint: number; whitePoint: number } {
   const clip = Math.max(1, Math.round(totalPixels * 0.005));
   let lo = 0;

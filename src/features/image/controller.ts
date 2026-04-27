@@ -8,7 +8,7 @@ import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import type { PicaResizer } from '../../infra/canvas/picaResize';
 import { buildImageRenderPlan, getImageAnalysisRegion } from '../../domain/geometry';
 import { buildUintHistogram } from '../../domain/histogram';
-import { buildGammaLut, buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
+import { buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
 import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/imageLoader';
 import { renderHistogram } from '../../infra/canvas/histogramRenderer';
 import { stepDownscaleAndResize } from '../../infra/canvas/picaResize';
@@ -26,7 +26,6 @@ export type ImageController = {
   requestConvert(): void;
   invalidateBaseRaster(): void;
   refreshTransformedSource(): Promise<void>;
-  rebuildGammaLut(): void;
   setRotation(rotation: Rotation): void;
   setZoom(zoom: number): void;
   toggleMirrorH(): void;
@@ -53,20 +52,6 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   function getState() {
     return deps.store.getState();
   }
-
-  function rebuildGammaLut(): void {
-    deps.runtime.gammaLut = buildGammaLut(getState().image.gammaValue);
-  }
-
-  let lastGammaValue = getState().image.gammaValue;
-  rebuildGammaLut();
-  deps.store.subscribe(() => {
-    const nextGammaValue = getState().image.gammaValue;
-    if (nextGammaValue !== lastGammaValue) {
-      lastGammaValue = nextGammaValue;
-      rebuildGammaLut();
-    }
-  });
 
   let processing = false;
   let processRequested = false;
@@ -321,7 +306,6 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
         blackPoint: state.image.blackPoint,
         whitePoint: state.image.whitePoint,
         gammaValue: state.image.gammaValue,
-        gammaLut: deps.runtime.gammaLut,
         contrastValue: state.image.contrastValue,
         invert: state.image.invert,
         ditherEnabled: state.image.ditherEnabled,
@@ -350,7 +334,6 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     requestConvert,
     invalidateBaseRaster,
     refreshTransformedSource,
-    rebuildGammaLut,
     setRotation,
     setZoom,
     toggleMirrorH,

@@ -7,6 +7,7 @@ import {
   applyInvert,
   buildGammaLut,
   buildLuminanceBuffer,
+  buildToneLut,
   computeAutoLevels,
   lum,
 } from '../../src/domain/tone';
@@ -50,6 +51,26 @@ describe('tone', () => {
 
     const inverted = applyInvert(new Float32Array([0, 255]));
     expect(Array.from(inverted)).toEqual([255, 0]);
+  });
+
+  it('buildToneLut matches the chained pipeline at integer luminance', () => {
+    const cases = [
+      { blackPoint: 30, whitePoint: 220, gammaValue: 2.2, contrastValue: 25, invert: false },
+      { blackPoint: 0, whitePoint: 255, gammaValue: 1.0, contrastValue: 0, invert: true },
+      { blackPoint: 10, whitePoint: 200, gammaValue: 0.5, contrastValue: -40, invert: true },
+    ];
+    for (const settings of cases) {
+      const lut = buildToneLut(settings);
+      const gammaLut = buildGammaLut(settings.gammaValue);
+      for (let i = 0; i < 256; i++) {
+        const v0 = new Float32Array([i]);
+        applyBlackWhitePoints(v0, settings.blackPoint, settings.whitePoint);
+        applyGamma(v0, gammaLut, settings.gammaValue);
+        applyContrast(v0, settings.contrastValue);
+        if (settings.invert) applyInvert(v0);
+        expect(lut[i]).toBeCloseTo(v0[0], 3);
+      }
+    }
   });
 
   it('computes auto levels from a histogram', () => {
