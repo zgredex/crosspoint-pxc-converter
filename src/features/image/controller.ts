@@ -1,3 +1,4 @@
+import { actions } from '../../app/actions';
 import type { AppStore } from '../../app/store';
 import type { AppDom } from '../../ui/dom';
 import type { ImageRuntime } from '../../app/runtime/imageRuntime';
@@ -41,7 +42,6 @@ type ImageControllerDeps = {
   showError: (message: string) => void;
   clearHistogramView: () => void;
   clearSnap: () => void;
-  syncUi: () => void;
 };
 
 const MAX_EDITOR_WIDTH = 340;
@@ -72,22 +72,22 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   }
 
   function setRotation(rotation: Rotation): void {
-    deps.store.dispatch({ type: 'image/setRotation', rotation });
+    deps.store.dispatch(actions.imageSetRotation(rotation));
     if (deps.runtime.loadedImg) void refreshTransformedSource();
   }
 
   function setZoom(zoom: number): void {
-    deps.store.dispatch({ type: 'image/setEditorZoom', editorZoom: zoom });
+    deps.store.dispatch(actions.imageSetEditorZoom(zoom));
     if (deps.runtime.loadedImg) void resetEditor();
   }
 
   function toggleMirrorH(): void {
-    deps.store.dispatch({ type: 'image/toggleMirrorH' });
+    deps.store.dispatch(actions.imageToggleMirrorH());
     if (deps.runtime.loadedImg) void refreshTransformedSource();
   }
 
   function toggleMirrorV(): void {
-    deps.store.dispatch({ type: 'image/toggleMirrorV' });
+    deps.store.dispatch(actions.imageToggleMirrorV());
     if (deps.runtime.loadedImg) void refreshTransformedSource();
   }
 
@@ -97,7 +97,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
   function unloadImage(): void {
     deps.clearStatus();
-    deps.store.dispatch({ type: 'setLoadedType', loadedType: null });
+    deps.store.dispatch(actions.setLoadedType(null));
 
     if (deps.runtime.convertTimer !== null) {
       clearTimeout(deps.runtime.convertTimer);
@@ -110,7 +110,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     }
 
     clearOutputBytes(deps.output);
-    deps.output.outputBaseName = 'sleep';
+    deps.store.dispatch(actions.outputClear());
+    deps.store.dispatch(actions.outputSetBaseName('sleep'));
 
     deps.dom.sourceCanvas.width = 1;
     deps.dom.sourceCanvas.height = 1;
@@ -118,7 +119,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     getContext2d(deps.dom.previewCanvas).clearRect(0, 0, getState().device.targetW, getState().device.targetH);
 
     deps.dom.fileInput.value = '';
-    deps.store.dispatch({ type: 'image/resetAll' });
+    deps.store.dispatch(actions.imageResetAll());
 
     if (deps.runtime.rotatedSrc) {
       deps.runtime.rotatedSrc.width = 1;
@@ -129,15 +130,14 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.clearSnap();
 
     deps.clearHistogramView();
-    deps.syncUi();
   }
 
   async function loadImageFile(file: File): Promise<void> {
     deps.clearStatus();
     unloadImage();
     try {
-      deps.output.outputBaseName = file.name.replace(/\.[^.]+$/, '');
-      deps.store.dispatch({ type: 'setLoadedType', loadedType: 'image' });
+      deps.store.dispatch(actions.outputSetBaseName(file.name.replace(/\.[^.]+$/, '')));
+      deps.store.dispatch(actions.setLoadedType('image'));
       deps.runtime.loadedImg = await loadImageFromDataUrl(await readFileAsDataUrl(file));
       await resetEditor();
     } catch (error) {
@@ -228,9 +228,9 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     const px = getContext2d(tempCanvas).getImageData(region.x, region.y, region.width, region.height).data;
     const levels = computeAutoLevels(buildUintHistogram(buildLuminanceBuffer(px)), region.pixelCount);
 
-    deps.store.dispatch({ type: 'image/setBlackPoint', blackPoint: levels.blackPoint });
-    deps.store.dispatch({ type: 'image/setWhitePoint', whitePoint: levels.whitePoint });
-    deps.store.dispatch({ type: 'image/setGamma', gammaValue: 1.0 });
+    deps.store.dispatch(actions.imageSetBlackPoint(levels.blackPoint));
+    deps.store.dispatch(actions.imageSetWhitePoint(levels.whitePoint));
+    deps.store.dispatch(actions.imageSetGamma(1.0));
     requestConvert(0);
   }
 
@@ -284,7 +284,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     drawHistogram();
     renderIndexedPreview(deps.dom.previewCanvas, outputs.indexedPixels, state.device.targetW, state.device.targetH);
     setOutputBytes(deps.output, outputs.pxcBytes, outputs.bmpBytes);
-    deps.syncUi();
+    deps.store.dispatch(actions.outputSetReady(true, true));
   }
 
   async function refreshTransformedSource(): Promise<void> {

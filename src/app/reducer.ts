@@ -1,4 +1,4 @@
-import { getDeviceState, initialAppState, initialGbState, initialImageState, type AppState } from './state';
+import { getDeviceState, initialAppState, initialGbState, initialImageState, initialOutputState, type AppState } from './state';
 import type { AppAction } from './actions';
 
 export function reducer(state: AppState = initialAppState, action: AppAction): AppState {
@@ -71,8 +71,18 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
       return { ...state, gb: { ...state.gb, zoom: action.zoom } };
     case 'gb/setOutputScale':
       return { ...state, gb: { ...state.gb, outputScale: action.outputScale } };
+    case 'gb/setDims':
+      return { ...state, gb: { ...state.gb, dims: action.dims } };
+    case 'gb/setFileInfo':
+      return { ...state, gb: { ...state.gb, fileInfo: action.fileInfo } };
     case 'gb/resetAll':
       return { ...state, gb: initialGbState };
+    case 'output/setReady':
+      return { ...state, output: { ...state.output, pxcReady: action.pxcReady, bmpReady: action.bmpReady } };
+    case 'output/clear':
+      return { ...state, output: { ...state.output, pxcReady: false, bmpReady: false } };
+    case 'output/setBaseName':
+      return { ...state, output: { ...state.output, baseName: action.baseName } };
     case 'ui/setMessage':
       return { ...state, ui: { tone: action.tone, message: action.message } };
     case 'ui/clearMessage':

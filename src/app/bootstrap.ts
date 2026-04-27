@@ -32,11 +32,11 @@ let imageController!: ImageController;
 let gbController!: GbController;
 let appController!: ReturnType<typeof createAppController>;
 
-function syncUi(): void {
-  renderStoreState(dom, store.getState(), { output: outputRuntime, gbRuntime });
+function render(): void {
+  renderStoreState(dom, store.getState());
 }
 
-store.subscribe(syncUi);
+store.subscribe(render);
 
 const {
   histogramCanvas,
@@ -74,7 +74,6 @@ imageController = createImageController({
   showError: message => showError(store, message),
   clearHistogramView,
   clearSnap,
-  syncUi,
 });
 
 gbController = createGbController({
@@ -86,7 +85,6 @@ gbController = createGbController({
   showError: message => showError(store, message),
   clearHistogramView,
   validateGbBytes,
-  syncUi,
 });
 
 appController = createAppController({
@@ -97,7 +95,6 @@ appController = createAppController({
   output: outputRuntime,
   imageController,
   gbController,
-  syncUi,
 });
 
 const loaderRouter = createLoaderRouter({
@@ -155,4 +152,4 @@ bindDownloadButtons({
   onDownloadBmp: appController.downloadBmp,
 });
 
-syncUi();
+render();

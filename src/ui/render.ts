@@ -1,13 +1,6 @@
 import type { AppState } from '../app/state';
-import { hasOutput, type OutputRuntime } from '../app/runtime/outputRuntime';
-import type { GbRuntime } from '../app/runtime/gbRuntime';
-import { buildGbFileInfo } from '../features/gb/service';
+import { selectGbDisplayScale } from '../features/gb/service';
 import type { AppDom } from './dom';
-
-type RenderRuntimeState = {
-  output: OutputRuntime;
-  gbRuntime: GbRuntime;
-};
 
 function getPanelSection(element: Element): HTMLElement {
   const section = element.closest('.panel-section');
@@ -21,17 +14,10 @@ function setActive(buttons: HTMLButtonElement[], predicate: (button: HTMLButtonE
   }
 }
 
-export function renderStoreState(dom: AppDom, state: AppState, runtime: RenderRuntimeState): void {
+export function renderStoreState(dom: AppDom, state: AppState): void {
   const isGbLoaded = state.loadedType === 'gb';
-  const outputVisible = hasOutput(runtime.output);
-  const fileInfo = isGbLoaded && runtime.gbRuntime.rawBytes
-    ? buildGbFileInfo({
-        name: runtime.output.outputBaseName,
-        rawByteLength: runtime.gbRuntime.rawBytes.length,
-        tilesWide: 20,
-        paletteRemap: runtime.gbRuntime.paletteRemap,
-      })
-    : null;
+  const outputVisible = state.output.pxcReady && state.output.bmpReady;
+  const fileInfo = isGbLoaded ? state.gb.fileInfo : null;
 
   dom.statusBanner.hidden = state.ui.message === null;
   dom.statusBanner.textContent = state.ui.message ?? '';
@@ -102,6 +88,6 @@ export function renderStoreState(dom: AppDom, state: AppState, runtime: RenderRu
     dom.zoomLabelEl.textContent = `${state.image.editorZoom}×`;
   } else {
     dom.rotateValEl.textContent = `${state.gb.rotation}°`;
-    dom.zoomLabelEl.textContent = `${runtime.gbRuntime.renderedScale}×`;
+    dom.zoomLabelEl.textContent = `${selectGbDisplayScale(state)}×`;
   }
 }

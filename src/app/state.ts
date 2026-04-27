@@ -8,6 +8,26 @@ export type FitBackground = 'white' | 'black';
 export type Rotation = 0 | 90 | 180 | 270;
 export type UiTone = 'error' | 'info' | null;
 
+export type OutputState = {
+  pxcReady: boolean;
+  bmpReady: boolean;
+  baseName: string;
+};
+
+export type GbDims = {
+  width: number;
+  height: number;
+};
+
+export type GbFileInfo = {
+  name: string;
+  sizeText: string;
+  tilesText: string;
+  dimsText: string;
+  warningText: string | null;
+  paletteInfoText: string | null;
+};
+
 export type DeviceState = {
   key: DeviceKey;
   targetW: number;
@@ -37,6 +57,8 @@ export type GbState = {
   rotation: Rotation;
   zoom: number;
   outputScale: number;
+  dims: GbDims | null;
+  fileInfo: GbFileInfo | null;
 };
 
 export type AppState = {
@@ -45,6 +67,7 @@ export type AppState = {
   background: FitBackground;
   image: ImageState;
   gb: GbState;
+  output: OutputState;
   ui: {
     tone: UiTone;
     message: string | null;
@@ -83,6 +106,14 @@ export const initialGbState: GbState = {
   rotation: 0,
   zoom: 0,
   outputScale: 1,
+  dims: null,
+  fileInfo: null,
+};
+
+export const initialOutputState: OutputState = {
+  pxcReady: false,
+  bmpReady: false,
+  baseName: 'sleep',
 };
 
 export const initialAppState: AppState = {
@@ -91,6 +122,7 @@ export const initialAppState: AppState = {
   background: 'white',
   image: initialImageState,
   gb: initialGbState,
+  output: initialOutputState,
   ui: {
     tone: null,
     message: null,

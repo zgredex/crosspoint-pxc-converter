@@ -6,10 +6,12 @@ import type { AppStore } from './store';
 import type { GbRuntime } from './runtime/gbRuntime';
 import type { ImageRuntime } from './runtime/imageRuntime';
 import type { FitBackground } from './state';
+
 import type { DeviceKey } from '../domain/devices';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
 import type { GbController } from '../features/gb/controller';
 import type { ImageController } from '../features/image/controller';
+import { selectGbDisplayScale } from '../features/gb/service';
 
 export type AppController = {
   handleDeviceChange(): void;
@@ -36,7 +38,6 @@ type AppControllerDeps = {
   output: OutputRuntime;
   imageController: ImageController;
   gbController: GbController;
-  syncUi: () => void;
 };
 
 const IMAGE_ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4] as const;
@@ -52,7 +53,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
   function clearOutput(): void {
     clearOutputBytes(deps.output);
-    deps.syncUi();
+    deps.store.dispatch(actions.outputClear());
   }
 
   function handleDeviceChange(): void {
@@ -145,9 +146,10 @@ export function createAppController(deps: AppControllerDeps): AppController {
     const state = deps.store.getState();
 
     if (state.loadedType === 'gb') {
+      const currentScale = selectGbDisplayScale(state);
       const nextZoom = direction === 'in'
-        ? Math.min(6, deps.gbRuntime.renderedScale + 1)
-        : Math.max(1, deps.gbRuntime.renderedScale - 1);
+        ? Math.min(6, currentScale + 1)
+        : Math.max(1, currentScale - 1);
       deps.gbController.setZoom(nextZoom);
       return;
     }
@@ -163,12 +165,12 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
   function downloadPxc(): void {
     if (!hasOutput(deps.output)) return;
-    triggerDownload(deps.output.pxcBytes, `${deps.output.outputBaseName}.pxc`, 'application/octet-stream');
+    triggerDownload(deps.output.pxcBytes, `${deps.store.getState().output.baseName}.pxc`, 'application/octet-stream');
   }
 
   function downloadBmp(): void {
     if (!hasOutput(deps.output)) return;
-    triggerDownload(deps.output.bmpBytes, `${deps.output.outputBaseName}.bmp`, 'image/bmp');
+    triggerDownload(deps.output.bmpBytes, `${deps.store.getState().output.baseName}.bmp`, 'image/bmp');
   }
 
   return {

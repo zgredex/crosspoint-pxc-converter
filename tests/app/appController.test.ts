@@ -36,9 +36,7 @@ function createController(state = initialAppState) {
   const output = {
     pxcBytes: null as Uint8Array | null,
     bmpBytes: null as Uint8Array | null,
-    outputBaseName: 'sleep',
   };
-  const syncUi = vi.fn();
 
   const controller = createAppController({
     store,
@@ -47,14 +45,13 @@ function createController(state = initialAppState) {
       previewCanvas: { width: 0, height: 0 },
     } as never,
     imageRuntime: { loadedImg: null } as never,
-    gbRuntime: { pixels: null, renderedScale: 2 } as never,
+    gbRuntime: { pixels: null } as never,
     output,
     imageController: imageController as never,
     gbController: gbController as never,
-    syncUi,
   });
 
-  return { controller, imageController, gbController, output, syncUi };
+  return { controller, store, imageController, gbController, output };
 }
 
 describe('appController', () => {
@@ -88,11 +85,10 @@ describe('appController', () => {
         previewCanvas: { width: 0, height: 0 },
       } as never,
       imageRuntime,
-      gbRuntime: { pixels: null, renderedScale: 2 } as never,
-      output: { pxcBytes: null, bmpBytes: null, outputBaseName: 'sleep' },
+      gbRuntime: { pixels: null } as never,
+      output: { pxcBytes: null, bmpBytes: null },
       imageController: imageController as never,
       gbController: gbController as never,
-      syncUi: vi.fn(),
     });
 
     instance.handleDeviceChange();
@@ -120,8 +116,8 @@ describe('appController', () => {
         previewCanvas: { width: 0, height: 0 },
       } as never,
       imageRuntime: { loadedImg: null } as never,
-      gbRuntime: { pixels: new Uint8Array([1]), renderedScale: 2 } as never,
-      output: { pxcBytes: null, bmpBytes: null, outputBaseName: 'sleep' },
+      gbRuntime: { pixels: new Uint8Array([1]) } as never,
+      output: { pxcBytes: null, bmpBytes: null },
       imageController: {
         resetEditor: vi.fn(),
         requestConvert: vi.fn(),
@@ -130,7 +126,6 @@ describe('appController', () => {
         unloadImage: vi.fn(),
       } as never,
       gbController: gbController as never,
-      syncUi: vi.fn(),
     });
 
     controller.handleDeviceChange();
@@ -139,7 +134,10 @@ describe('appController', () => {
   });
 
   it('guards downloads until both output byte buffers exist', () => {
-    const { controller, output } = createController();
+    const { controller, output } = createController({
+      ...initialAppState,
+      output: { pxcReady: false, bmpReady: false, baseName: 'sample' },
+    });
     const downloadSpy = vi.mocked(triggerDownload);
 
     controller.downloadPxc();
@@ -148,7 +146,6 @@ describe('appController', () => {
 
     output.pxcBytes = new Uint8Array([1]);
     output.bmpBytes = new Uint8Array([2]);
-    output.outputBaseName = 'sample';
 
     controller.downloadPxc();
     controller.downloadBmp();

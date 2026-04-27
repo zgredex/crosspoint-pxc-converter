@@ -40,7 +40,6 @@ describe('gb controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       validateGbBytes: vi.fn(),
-      syncUi: vi.fn(),
     });
 
     controller.setRotation(180);
@@ -63,7 +62,6 @@ describe('gb controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       validateGbBytes: vi.fn(),
-      syncUi: vi.fn(),
     });
 
     controller.setZoom(3);

@@ -2,7 +2,7 @@ import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { FitAlign } from '../domain/geometry';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
-import type { FitBackground, LoadedType, Rotation, UiTone } from './state';
+import type { FitBackground, GbDims, GbFileInfo, LoadedType, Rotation, UiTone } from './state';
 
 export type AppAction =
   | { type: 'setLoadedType'; loadedType: LoadedType }
@@ -29,7 +29,12 @@ export type AppAction =
   | { type: 'gb/setRotation'; rotation: Rotation }
   | { type: 'gb/setZoom'; zoom: number }
   | { type: 'gb/setOutputScale'; outputScale: number }
+  | { type: 'gb/setDims'; dims: GbDims | null }
+  | { type: 'gb/setFileInfo'; fileInfo: GbFileInfo | null }
   | { type: 'gb/resetAll' }
+  | { type: 'output/setReady'; pxcReady: boolean; bmpReady: boolean }
+  | { type: 'output/clear' }
+  | { type: 'output/setBaseName'; baseName: string }
   | { type: 'ui/setMessage'; tone: UiTone; message: string }
   | { type: 'ui/clearMessage' };
 
@@ -58,7 +63,12 @@ export const actions = {
   gbSetRotation: (rotation: Rotation): AppAction => ({ type: 'gb/setRotation', rotation }),
   gbSetZoom: (zoom: number): AppAction => ({ type: 'gb/setZoom', zoom }),
   gbSetOutputScale: (outputScale: number): AppAction => ({ type: 'gb/setOutputScale', outputScale }),
+  gbSetDims: (dims: GbDims | null): AppAction => ({ type: 'gb/setDims', dims }),
+  gbSetFileInfo: (fileInfo: GbFileInfo | null): AppAction => ({ type: 'gb/setFileInfo', fileInfo }),
   gbResetAll: (): AppAction => ({ type: 'gb/resetAll' }),
+  outputSetReady: (pxcReady: boolean, bmpReady: boolean): AppAction => ({ type: 'output/setReady', pxcReady, bmpReady }),
+  outputClear: (): AppAction => ({ type: 'output/clear' }),
+  outputSetBaseName: (baseName: string): AppAction => ({ type: 'output/setBaseName', baseName }),
   uiSetMessage: (tone: UiTone, message: string): AppAction => ({ type: 'ui/setMessage', tone, message }),
   uiClearMessage: (): AppAction => ({ type: 'ui/clearMessage' }),
 };
