@@ -1,10 +1,8 @@
-import { hasOutput, type OutputRuntime } from '../app/runtime/outputRuntime';
 import type { AppStore } from '../app/store';
 import { getContext2d } from '../infra/canvas/context';
 
 type PreviewZoomDeps = {
   store: AppStore;
-  output: OutputRuntime;
   previewCanvas: HTMLCanvasElement;
   zoomBox: HTMLDivElement;
   zoomCanvas: HTMLCanvasElement;
@@ -15,7 +13,7 @@ const ZOOM_SOURCE_SIZE = 72;
 
 export function setupPreviewZoom(deps: PreviewZoomDeps): void {
   deps.previewCanvas.addEventListener('mouseenter', () => {
-    if (hasOutput(deps.output)) deps.zoomBox.style.display = 'block';
+    if (deps.store.getState().output.pxcReady) deps.zoomBox.style.display = 'block';
   });
 
   deps.previewCanvas.addEventListener('mouseleave', () => {
@@ -23,7 +21,7 @@ export function setupPreviewZoom(deps: PreviewZoomDeps): void {
   });
 
   deps.previewCanvas.addEventListener('mousemove', event => {
-    if (!hasOutput(deps.output)) return;
+    if (!deps.store.getState().output.pxcReady) return;
 
     const { targetW: width, targetH: height } = deps.store.getState().device;
     const rect = deps.previewCanvas.getBoundingClientRect();

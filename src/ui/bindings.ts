@@ -11,7 +11,7 @@ import type { AppDom } from './dom';
 type BindingDeps = {
   store: AppStore;
   appController: Pick<AppController, 'setBackground' | 'setDevice' | 'setGbInvert' | 'setGbPalette' | 'setImageMode'>;
-  scheduleConvert: (delay: number) => void;
+  scheduleConvert: () => void;
   autoLevels: () => void | Promise<void>;
 };
 
@@ -25,37 +25,37 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
 
   dom.invertToggle.addEventListener('change', () => {
     store.dispatch(actions.imageSetInvert(dom.invertToggle.checked));
-    scheduleConvert(0);
+    scheduleConvert();
   });
 
   dom.ditherToggle.addEventListener('change', () => {
     store.dispatch(actions.imageSetDitherEnabled(dom.ditherToggle.checked));
-    scheduleConvert(0);
+    scheduleConvert();
   });
 
   dom.contrastSlider.addEventListener('input', () => {
     store.dispatch(actions.imageSetContrast(parseInt(dom.contrastSlider.value)));
-    scheduleConvert(50);
+    scheduleConvert();
   });
 
   dom.contrastReset.addEventListener('click', () => {
     store.dispatch(actions.imageResetContrast());
-    scheduleConvert(0);
+    scheduleConvert();
   });
 
   dom.blackSlider.addEventListener('input', () => {
     store.dispatch(actions.imageSetBlackPoint(parseInt(dom.blackSlider.value)));
-    scheduleConvert(50);
+    scheduleConvert();
   });
 
   dom.whiteSlider.addEventListener('input', () => {
     store.dispatch(actions.imageSetWhitePoint(parseInt(dom.whiteSlider.value)));
-    scheduleConvert(50);
+    scheduleConvert();
   });
 
   dom.toneReset.addEventListener('click', () => {
     store.dispatch(actions.imageResetTone());
-    scheduleConvert(0);
+    scheduleConvert();
   });
 
   dom.autoLevelsBtn.addEventListener('click', () => {
@@ -66,7 +66,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     let nextGammaValue = parseInt(dom.gammaSlider.value) / 100;
     if (nextGammaValue < 0.01) nextGammaValue = 0.01;
     store.dispatch(actions.imageSetGamma(nextGammaValue));
-    scheduleConvert(50);
+    scheduleConvert();
   });
 
   for (const button of dom.deviceButtons) {
@@ -90,7 +90,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
       const ditherMode = button.dataset.dither;
       if (!ditherMode) return;
       store.dispatch(actions.imageSetDitherMode(ditherMode as DitherMode));
-      scheduleConvert(0);
+      scheduleConvert();
     });
   }
 
@@ -99,7 +99,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
       const fitAlign = button.dataset.pos;
       if (!fitAlign) return;
       store.dispatch(actions.imageSetFitAlign(fitAlign as FitAlign));
-      scheduleConvert(0);
+      scheduleConvert();
     });
   }
 

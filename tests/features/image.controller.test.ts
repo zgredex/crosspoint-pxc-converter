@@ -6,6 +6,15 @@ import { createImageRuntime } from '../../src/app/runtime/imageRuntime';
 import { createOutputRuntime } from '../../src/app/runtime/outputRuntime';
 import { createImageController } from '../../src/features/image/controller';
 
+function createMockWorker() {
+  return {
+    setBaseRaster: vi.fn(),
+    process: vi.fn(),
+    onResult: vi.fn(),
+    terminate: vi.fn(),
+  };
+}
+
 function createMockStore(state = initialAppState): AppStore & { actions: unknown[] } {
   const actions: unknown[] = [];
   return {
@@ -36,6 +45,7 @@ describe('image controller', () => {
       runtime: createImageRuntime(),
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
+      worker: createMockWorker(),
       clearStatus: vi.fn(),
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
@@ -60,6 +70,7 @@ describe('image controller', () => {
       runtime: createImageRuntime(),
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
+      worker: createMockWorker(),
       clearStatus: vi.fn(),
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
@@ -85,6 +96,7 @@ describe('image controller', () => {
       runtime,
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
+      worker: createMockWorker(),
       clearStatus: vi.fn(),
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
@@ -97,8 +109,13 @@ describe('image controller', () => {
     expect(runtime.gammaLut?.[255]).toBe(255);
   });
 
-  it('debounces scheduled conversion requests through the runtime timer', () => {
-    vi.useFakeTimers();
+  it('cancels previous rAF before scheduling a new one', () => {
+    const rafIds: number[] = [];
+    let nextId = 0;
+    const mockRaf = (cb: FrameRequestCallback) => { const id = ++nextId; rafIds.push(id); return id; };
+    const mockCaf = (id: number) => { const idx = rafIds.indexOf(id); if (idx >= 0) rafIds.splice(idx, 1); };
+    vi.stubGlobal('requestAnimationFrame', mockRaf);
+    vi.stubGlobal('cancelAnimationFrame', mockCaf);
 
     const runtime = createImageRuntime();
     const controller = createImageController({
@@ -110,18 +127,21 @@ describe('image controller', () => {
       runtime,
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
+      worker: createMockWorker(),
       clearStatus: vi.fn(),
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
     });
 
-    controller.requestConvert(50);
+    controller.requestConvert();
     const firstTimer = runtime.convertTimer;
-    controller.requestConvert(10);
+    controller.requestConvert();
 
     expect(firstTimer).not.toBe(runtime.convertTimer);
+    expect(firstTimer).toBe(1);
+    expect(runtime.convertTimer).toBe(2);
 
-    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 });

@@ -11,8 +11,11 @@ export type ImageRuntime = {
   boxX: number;
   boxY: number;
   lastHistogram: Float32Array | null;
-  convertTimer: ReturnType<typeof setTimeout> | null;
-  convertGen: number;
+  lastIndexedPixels: Uint8Array | null;
+  cachedBaseRaster: Uint8ClampedArray | null;
+  sharedBufferVersion: number;
+  processVersion: number;
+  convertTimer: number | null;
   autoLevelsGen: number;
 };
 
@@ -30,8 +33,11 @@ export function createImageRuntime(): ImageRuntime {
     boxX: 0,
     boxY: 0,
     lastHistogram: null,
+    lastIndexedPixels: null,
+    cachedBaseRaster: null,
+    sharedBufferVersion: 0,
+    processVersion: 0,
     convertTimer: null,
-    convertGen: 0,
     autoLevelsGen: 0,
   };
 }

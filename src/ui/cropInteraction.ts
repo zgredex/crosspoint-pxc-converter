@@ -17,7 +17,7 @@ type CropInteractionDeps = {
   getBoxState: () => BoxState;
   setBoxPosition: (x: number, y: number) => void;
   applyCropBox: () => void;
-  scheduleConvert: (delay: number) => void;
+  scheduleConvert: () => void;
 };
 
 export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: () => void } {
@@ -73,14 +73,14 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     deps.snapGuideV.classList.toggle('active', snapH);
     deps.snapGuideH.classList.toggle('active', snapV);
     deps.cropBox.classList.toggle('snapped', snapH || snapV);
-    deps.scheduleConvert(100);
+    deps.scheduleConvert();
   }
 
   function onDragEnd(): void {
     if (!isDragging) return;
     isDragging = false;
     window.setTimeout(clearSnap, 600);
-    deps.scheduleConvert(0);
+    deps.scheduleConvert();
   }
 
   deps.cropBox.addEventListener('mousedown', onDragStart);
@@ -101,7 +101,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     const rect = deps.sourceCanvas.getBoundingClientRect();
     deps.setBoxPosition((event.clientX - rect.left) - boxW / 2, (event.clientY - rect.top) - boxH / 2);
     deps.applyCropBox();
-    deps.scheduleConvert(100);
+    deps.scheduleConvert();
   });
 
   return { clearSnap };

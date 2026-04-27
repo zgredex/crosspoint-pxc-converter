@@ -20,46 +20,42 @@ export function buildLuminanceBuffer(rgba: Uint8ClampedArray): Float32Array {
 }
 
 export function applyBlackWhitePoints(values: Float32Array, blackPoint: number, whitePoint: number): Float32Array {
-  if (blackPoint <= 0 && whitePoint >= 255) return new Float32Array(values);
+  if (blackPoint <= 0 && whitePoint >= 255) return values;
 
-  const out = new Float32Array(values);
   const range = whitePoint - blackPoint;
-  if (range <= 0) return out;
+  if (range <= 0) return values;
 
-  for (let i = 0; i < out.length; i++) {
-    out[i] = Math.max(0, Math.min(255, (out[i] - blackPoint) / range * 255));
+  for (let i = 0; i < values.length; i++) {
+    values[i] = Math.max(0, Math.min(255, (values[i] - blackPoint) / range * 255));
   }
 
-  return out;
+  return values;
 }
 
 export function applyGamma(values: Float32Array, gammaLut: Float32Array | null, gammaValue: number): Float32Array {
-  if (gammaValue === 1.0 || !gammaLut) return new Float32Array(values);
+  if (gammaValue === 1.0 || !gammaLut) return values;
 
-  const out = new Float32Array(values.length);
   for (let i = 0; i < values.length; i++) {
-    out[i] = gammaLut[Math.min(255, Math.max(0, Math.round(values[i])))];
+    values[i] = gammaLut[Math.min(255, Math.max(0, Math.round(values[i])))];
   }
-  return out;
+  return values;
 }
 
 export function applyContrast(values: Float32Array, contrastValue: number): Float32Array {
-  if (contrastValue === 0) return new Float32Array(values);
+  if (contrastValue === 0) return values;
 
   const factor = contrastValue >= 0 ? 1 + contrastValue * 2 / 100 : 1 + contrastValue / 100;
-  const out = new Float32Array(values.length);
   for (let i = 0; i < values.length; i++) {
-    out[i] = Math.max(0, Math.min(255, (values[i] - 127.5) * factor + 127.5));
+    values[i] = Math.max(0, Math.min(255, (values[i] - 127.5) * factor + 127.5));
   }
-  return out;
+  return values;
 }
 
 export function applyInvert(values: Float32Array): Float32Array {
-  const out = new Float32Array(values.length);
   for (let i = 0; i < values.length; i++) {
-    out[i] = 255 - values[i];
+    values[i] = 255 - values[i];
   }
-  return out;
+  return values;
 }
 
 export function computeAutoLevels(hist: Uint32Array, totalPixels: number): { blackPoint: number; whitePoint: number } {

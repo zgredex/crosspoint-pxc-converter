@@ -2,7 +2,7 @@ import { actions } from '../../app/actions';
 import type { AppStore } from '../../app/store';
 import type { AppDom } from '../../ui/dom';
 import type { ImageRuntime } from '../../app/runtime/imageRuntime';
-import { clearOutputBytes, setOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
+import { clearOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
 import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import type { PicaResizer } from '../../infra/canvas/picaResize';
@@ -11,19 +11,20 @@ import { buildUintHistogram } from '../../domain/histogram';
 import { buildGammaLut, buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
 import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/imageLoader';
 import { renderHistogram } from '../../infra/canvas/histogramRenderer';
-import { resizeWithPica } from '../../infra/canvas/picaResize';
+import { stepDownscaleAndResize } from '../../infra/canvas/picaResize';
 import { renderIndexedPreview } from '../../infra/canvas/previewRenderer';
-import { buildImageOutputs, renderImageBaseRaster } from './service';
+import { renderImageBaseRaster } from './service';
 import { applyCropBoxToDom } from './cropBox';
 import { buildRotatedSource, getSourceImage, srcH, srcW } from './source';
+import { createImageWorkerClient, type ImageWorkerClient } from '../../infra/worker/imageWorkerClient';
 
 export type ImageController = {
   loadImageFile(file: File): Promise<void>;
   unloadImage(): void;
   resetEditor(): Promise<void>;
   autoLevels(): Promise<void>;
-  convert(): Promise<void>;
-  requestConvert(delay: number): void;
+  requestConvert(): void;
+  invalidateBaseRaster(): void;
   refreshTransformedSource(): Promise<void>;
   rebuildGammaLut(): void;
   setRotation(rotation: Rotation): void;
@@ -38,6 +39,7 @@ type ImageControllerDeps = {
   runtime: ImageRuntime;
   output: OutputRuntime;
   pica: PicaResizer;
+  worker: ImageWorkerClient;
   clearStatus: () => void;
   showError: (message: string) => void;
   clearHistogramView: () => void;
@@ -66,9 +68,37 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     }
   });
 
-  function requestConvert(delay: number): void {
-    if (deps.runtime.convertTimer !== null) clearTimeout(deps.runtime.convertTimer);
-    deps.runtime.convertTimer = setTimeout(convert, delay);
+  let processing = false;
+  let processRequested = false;
+  let rasterDirty = true;
+
+  deps.worker.onResult((result) => {
+    if (result.version !== deps.runtime.processVersion) return;
+
+    const state = getState();
+    deps.runtime.lastIndexedPixels = new Uint8Array(result.indexedPixels);
+    deps.runtime.lastHistogram = new Float32Array(result.histogram);
+
+    renderIndexedPreview(deps.dom.previewCanvas, deps.runtime.lastIndexedPixels, state.device.targetW, state.device.targetH);
+    renderHistogram(deps.dom.histogramCanvas, deps.runtime.lastHistogram, state.device.totalPixels);
+    deps.store.dispatch(actions.outputSetReady(true, true));
+
+    processing = false;
+    if (processRequested) scheduleNextConvert();
+  });
+
+  function requestConvert(): void {
+    if (deps.runtime.convertTimer !== null) cancelAnimationFrame(deps.runtime.convertTimer);
+    processRequested = true;
+    if (processing) return;
+    scheduleNextConvert();
+  }
+
+  function scheduleNextConvert(): void {
+    deps.runtime.convertTimer = requestAnimationFrame(() => {
+      deps.runtime.convertTimer = null;
+      void convert();
+    });
   }
 
   function setRotation(rotation: Rotation): void {
@@ -91,16 +121,12 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (deps.runtime.loadedImg) void refreshTransformedSource();
   }
 
-  function drawHistogram(): void {
-    renderHistogram(deps.dom.histogramCanvas, deps.runtime.lastHistogram, getState().device.totalPixels);
-  }
-
   function unloadImage(): void {
     deps.clearStatus();
     deps.store.dispatch(actions.setLoadedType(null));
 
     if (deps.runtime.convertTimer !== null) {
-      clearTimeout(deps.runtime.convertTimer);
+      cancelAnimationFrame(deps.runtime.convertTimer);
       deps.runtime.convertTimer = null;
     }
 
@@ -112,6 +138,10 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     clearOutputBytes(deps.output);
     deps.store.dispatch(actions.outputClear());
     deps.store.dispatch(actions.outputSetBaseName('sleep'));
+    deps.runtime.cachedBaseRaster = null;
+    deps.runtime.lastIndexedPixels = null;
+    deps.runtime.sharedBufferVersion = 0;
+    rasterDirty = true;
 
     deps.dom.sourceCanvas.width = 1;
     deps.dom.sourceCanvas.height = 1;
@@ -179,7 +209,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
     deps.dom.sourceCanvas.width = deps.runtime.dispImgW;
     deps.dom.sourceCanvas.height = deps.runtime.dispImgH;
-    await resizeWithPica(deps.pica, src, deps.dom.sourceCanvas);
+    await stepDownscaleAndResize(deps.pica, src, deps.dom.sourceCanvas);
     deps.dom.sourceFrame.style.width = `${Math.min(deps.runtime.dispImgW, MAX_EDITOR_WIDTH)}px`;
     deps.dom.sourceFrame.style.height = `${Math.min(deps.runtime.dispImgH, MAX_EDITOR_HEIGHT)}px`;
 
@@ -190,7 +220,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.clearSnap();
     }
 
-    requestConvert(0);
+    rasterDirty = true;
+    requestConvert();
   }
 
   async function autoLevels(): Promise<void> {
@@ -231,43 +262,61 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.store.dispatch(actions.imageSetBlackPoint(levels.blackPoint));
     deps.store.dispatch(actions.imageSetWhitePoint(levels.whitePoint));
     deps.store.dispatch(actions.imageSetGamma(1.0));
-    requestConvert(0);
+    requestConvert();
   }
 
   async function convert(): Promise<void> {
     if (!deps.runtime.loadedImg) return;
 
+    processing = true;
+    processRequested = false;
+
     const state = getState();
-    const gen = ++deps.runtime.convertGen;
-    const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
-    const sourceWidth = srcW(src);
-    const sourceHeight = srcH(src);
-    const plan = buildImageRenderPlan({
-      mode: state.image.mode,
-      sourceW: sourceWidth,
-      sourceH: sourceHeight,
-      targetW: state.device.targetW,
-      targetH: state.device.targetH,
-      fitAlign: state.image.fitAlign,
-      displayScale: deps.runtime.displayScale,
-      workScale: deps.runtime.workScale,
-      boxX: deps.runtime.boxX,
-      boxY: deps.runtime.boxY,
-    });
 
-    await renderImageBaseRaster({
-      src,
-      targetCanvas: deps.dom.workCanvas,
-      plan,
-      fitBg: state.background,
-      pica: deps.pica,
-    });
-    if (gen !== deps.runtime.convertGen) return;
+    if (rasterDirty || !deps.runtime.cachedBaseRaster) {
+      const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
+      const sourceWidth = srcW(src);
+      const sourceHeight = srcH(src);
+      const plan = buildImageRenderPlan({
+        mode: state.image.mode,
+        sourceW: sourceWidth,
+        sourceH: sourceHeight,
+        targetW: state.device.targetW,
+        targetH: state.device.targetH,
+        fitAlign: state.image.fitAlign,
+        displayScale: deps.runtime.displayScale,
+        workScale: deps.runtime.workScale,
+        boxX: deps.runtime.boxX,
+        boxY: deps.runtime.boxY,
+      });
 
-    const outputs = buildImageOutputs(
-      getContext2d(deps.dom.workCanvas).getImageData(0, 0, state.device.targetW, state.device.targetH).data,
-      state.device.targetW,
-      state.device.targetH,
+      await renderImageBaseRaster({
+        src,
+        targetCanvas: deps.dom.workCanvas,
+        plan,
+        fitBg: state.background,
+        pica: deps.pica,
+      });
+
+      deps.runtime.cachedBaseRaster = getContext2d(deps.dom.workCanvas).getImageData(
+        0, 0, state.device.targetW, state.device.targetH,
+      ).data;
+
+      const sharedBuffer = new SharedArrayBuffer(deps.runtime.cachedBaseRaster.byteLength);
+      new Uint8ClampedArray(sharedBuffer).set(deps.runtime.cachedBaseRaster);
+      deps.runtime.sharedBufferVersion++;
+      deps.worker.setBaseRaster(
+        sharedBuffer,
+        state.device.targetW,
+        state.device.targetH,
+        deps.runtime.sharedBufferVersion,
+      );
+
+      rasterDirty = false;
+    }
+
+    deps.runtime.processVersion++;
+    deps.worker.process(
       {
         blackPoint: state.image.blackPoint,
         whitePoint: state.image.whitePoint,
@@ -278,13 +327,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
         ditherEnabled: state.image.ditherEnabled,
         ditherMode: state.image.ditherMode,
       },
+      deps.runtime.processVersion,
     );
-
-    deps.runtime.lastHistogram = outputs.histogram;
-    drawHistogram();
-    renderIndexedPreview(deps.dom.previewCanvas, outputs.indexedPixels, state.device.targetW, state.device.targetH);
-    setOutputBytes(deps.output, outputs.pxcBytes, outputs.bmpBytes);
-    deps.store.dispatch(actions.outputSetReady(true, true));
   }
 
   async function refreshTransformedSource(): Promise<void> {
@@ -294,13 +338,17 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     await resetEditor();
   }
 
+  function invalidateBaseRaster(): void {
+    rasterDirty = true;
+  }
+
   return {
     loadImageFile,
     unloadImage,
     resetEditor,
     autoLevels,
-    convert,
     requestConvert,
+    invalidateBaseRaster,
     refreshTransformedSource,
     rebuildGammaLut,
     setRotation,

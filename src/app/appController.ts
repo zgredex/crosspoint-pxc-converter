@@ -1,11 +1,13 @@
 import { actions } from './actions';
 import type { AppDom } from '../ui/dom';
 import { triggerDownload } from '../infra/browser/downloads';
-import { clearOutputBytes, hasOutput, type OutputRuntime } from './runtime/outputRuntime';
+import { clearOutputBytes, type OutputRuntime } from './runtime/outputRuntime';
 import type { AppStore } from './store';
 import type { GbRuntime } from './runtime/gbRuntime';
 import type { ImageRuntime } from './runtime/imageRuntime';
 import type { FitBackground } from './state';
+import { encodePxc } from '../domain/formats/pxc';
+import { encodeGrayBmp } from '../domain/formats/bmpGray';
 
 import type { DeviceKey } from '../domain/devices';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
@@ -92,7 +94,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
     }
 
     if (deps.imageRuntime.loadedImg) {
-      deps.imageController.requestConvert(0);
+      deps.imageController.requestConvert();
     }
   }
 
@@ -164,13 +166,29 @@ export function createAppController(deps: AppControllerDeps): AppController {
   }
 
   function downloadPxc(): void {
-    if (!hasOutput(deps.output)) return;
-    triggerDownload(deps.output.pxcBytes, `${deps.store.getState().output.baseName}.pxc`, 'application/octet-stream');
+    const state = deps.store.getState();
+    if (state.loadedType === 'image') {
+      const px = deps.imageRuntime.lastIndexedPixels;
+      if (!px) return;
+      triggerDownload(encodePxc(px, state.device.targetW, state.device.targetH), `${state.output.baseName}.pxc`, 'application/octet-stream');
+      return;
+    }
+    if (deps.output.pxcBytes) {
+      triggerDownload(deps.output.pxcBytes, `${state.output.baseName}.pxc`, 'application/octet-stream');
+    }
   }
 
   function downloadBmp(): void {
-    if (!hasOutput(deps.output)) return;
-    triggerDownload(deps.output.bmpBytes, `${deps.store.getState().output.baseName}.bmp`, 'image/bmp');
+    const state = deps.store.getState();
+    if (state.loadedType === 'image') {
+      const px = deps.imageRuntime.lastIndexedPixels;
+      if (!px) return;
+      triggerDownload(encodeGrayBmp(px, state.device.targetW, state.device.targetH), `${state.output.baseName}.bmp`, 'image/bmp');
+      return;
+    }
+    if (deps.output.bmpBytes) {
+      triggerDownload(deps.output.bmpBytes, `${state.output.baseName}.bmp`, 'image/bmp');
+    }
   }
 
   return {

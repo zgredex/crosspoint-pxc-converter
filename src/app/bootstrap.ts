@@ -8,6 +8,7 @@ import { store } from './store';
 import { validateGbBytes } from './validation';
 import { clearHistogram, mountHistogramAutoResize } from '../infra/canvas/histogramRenderer';
 import { createPicaResizer } from '../infra/canvas/picaResize';
+import { createImageWorkerClient } from '../infra/worker/imageWorkerClient';
 import { createGbController } from '../features/gb/controller';
 import { createImageController } from '../features/image/controller';
 import { setupImageCropInteraction } from '../features/image/cropWiring';
@@ -50,12 +51,14 @@ function clearHistogramView(): void {
 }
 
 const picaInstance = createPicaResizer();
+const workerClient = createImageWorkerClient();
 
 const { clearSnap } = setupImageCropInteraction({
   store,
   dom,
   runtime: imageRuntime,
-  scheduleConvert: delay => imageController.requestConvert(delay),
+  scheduleConvert: () => imageController.requestConvert(),
+  invalidateBaseRaster: () => imageController.invalidateBaseRaster(),
 });
 
 mountHistogramAutoResize({
@@ -70,6 +73,7 @@ imageController = createImageController({
   runtime: imageRuntime,
   output: outputRuntime,
   pica: picaInstance,
+  worker: workerClient,
   clearStatus: () => clearStatus(store),
   showError: message => showError(store, message),
   clearHistogramView,
@@ -111,7 +115,6 @@ bindStoreControls(dom, {
 
 setupPreviewZoom({
   store,
-  output: outputRuntime,
   previewCanvas,
   zoomBox,
   zoomCanvas,

@@ -133,12 +133,14 @@ describe('appController', () => {
     expect(gbController.buildOutput).toHaveBeenCalledOnce();
   });
 
-  it('guards downloads until both output byte buffers exist', () => {
+  it('guards downloads until both output byte buffers exist (gb path)', () => {
     const { controller, output } = createController({
       ...initialAppState,
+      loadedType: 'gb',
       output: { pxcReady: false, bmpReady: false, baseName: 'sample' },
     });
     const downloadSpy = vi.mocked(triggerDownload);
+    downloadSpy.mockClear();
 
     controller.downloadPxc();
     controller.downloadBmp();

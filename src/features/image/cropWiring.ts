@@ -10,7 +10,8 @@ type CropWiringDeps = {
   store: AppStore;
   dom: AppDom;
   runtime: ImageRuntime;
-  scheduleConvert: (delay: number) => void;
+  scheduleConvert: () => void;
+  invalidateBaseRaster: () => void;
 };
 
 export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: () => void } {
@@ -38,6 +39,9 @@ export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: ()
       cropBox: deps.dom.cropBox,
       sourceFrame: deps.dom.sourceFrame,
     }),
-    scheduleConvert: deps.scheduleConvert,
+    scheduleConvert: () => {
+      deps.invalidateBaseRaster();
+      deps.scheduleConvert();
+    },
   });
 }
