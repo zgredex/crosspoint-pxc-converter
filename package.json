@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "gen:blue-noise": "tsx scripts/gen-blue-noise.ts"
   },
   "dependencies": {
     "pica": "^9.0.1"

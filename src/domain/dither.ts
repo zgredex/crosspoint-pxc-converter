@@ -1,6 +1,7 @@
 import { GRAY_DISP, quantize } from './quantize';
+import { BLUE_NOISE_64 } from './blueNoise';
 
-export type DitherMode = 'fs' | 'atk' | 'jjn' | 'stucki' | 'burkes' | 'bayer' | 'zhou-fang';
+export type DitherMode = 'fs' | 'atk' | 'jjn' | 'stucki' | 'burkes' | 'bayer' | 'zhou-fang' | 'blue-noise';
 
 export function ditherToIndexedGray(
   source: Float32Array,
@@ -19,19 +20,16 @@ export function ditherToIndexedGray(
     return q;
   }
 
-  const BAYER4 = [
-    [0, 8, 2, 10],
-    [12, 4, 14, 6],
-    [3, 11, 1, 9],
-    [15, 7, 13, 5],
-  ];
-
-  if (mode === 'bayer') {
+  if (mode === 'bayer' || mode === 'blue-noise') {
+    const threshold =
+      mode === 'bayer'
+        ? (_x: number, y: number, x: number) => [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5][(y & 3) * 4 + (x & 3)] / 16
+        : (_x: number, y: number, x: number) => (BLUE_NOISE_64[((y & 63) << 6) | (x & 63)] + 0.5) / 256;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = y * width + x;
         const v = Math.max(0, Math.min(255, buf[i]));
-        const t = BAYER4[y & 3][x & 3] / 16;
+        const t = threshold(i, y, x);
         let lo = 0;
         for (let k = 2; k >= 0; k--) {
           if (v >= GRAY_DISP[k]) {
