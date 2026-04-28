@@ -85,7 +85,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
 
   if (state.loadedType !== 'gb') {
     dom.rotateValEl.textContent = `${state.image.rotation}°`;
-    dom.zoomLabelEl.textContent = `${state.image.editorZoom}×`;
+    dom.zoomLabelEl.textContent = `${state.image.editorZoom.toFixed(state.image.editorZoom < 10 ? 2 : 1)}×`;
   } else {
     dom.rotateValEl.textContent = `${state.gb.rotation}°`;
     dom.zoomLabelEl.textContent = `${selectGbDisplayScale(state)}×`;

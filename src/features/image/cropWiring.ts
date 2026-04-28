@@ -5,6 +5,7 @@ import type { ImageRuntime } from '../../app/runtime/imageRuntime';
 import { applyCropBoxToDom } from './cropBox';
 
 const SNAP_THRESHOLD = 9;
+const WHEEL_ZOOM_K = 0.0015;
 
 type CropWiringDeps = {
   store: AppStore;
@@ -12,15 +13,21 @@ type CropWiringDeps = {
   runtime: ImageRuntime;
   scheduleConvert: () => void;
   invalidateBaseRaster: () => void;
+  applyEditorZoom: (targetZoom: number, anchorClientX?: number, anchorClientY?: number) => void;
 };
 
 export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: () => void } {
   return setupCropInteraction({
     cropBox: deps.dom.cropBox,
     sourceCanvas: deps.dom.sourceCanvas,
+    sourceFrame: deps.dom.sourceFrame,
     snapGuideH: deps.dom.snapGuideH,
     snapGuideV: deps.dom.snapGuideV,
     snapThreshold: SNAP_THRESHOLD,
+    wheelZoomK: WHEEL_ZOOM_K,
+    isImageLoaded: () => deps.store.getState().loadedType === 'image',
+    getEditorZoom: () => deps.store.getState().image.editorZoom,
+    applyEditorZoom: deps.applyEditorZoom,
     getMode: () => deps.store.getState().image.mode,
     getBoxState: () => ({
       dispImgW: deps.runtime.dispImgW,

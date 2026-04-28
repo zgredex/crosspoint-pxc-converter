@@ -5,6 +5,7 @@ export function applyCropBoxToDom(params: {
   cropBox: HTMLDivElement;
   sourceFrame: HTMLDivElement;
   margin?: number;
+  scrollIntoView?: boolean;
 }): void {
   const { runtime, cropBox, sourceFrame } = params;
   const margin = params.margin ?? 20;
@@ -16,6 +17,8 @@ export function applyCropBoxToDom(params: {
   cropBox.style.top = `${runtime.boxY}px`;
   cropBox.style.width = `${runtime.boxW}px`;
   cropBox.style.height = `${runtime.boxH}px`;
+
+  if (params.scrollIntoView === false) return;
 
   const visibleLeft = sourceFrame.scrollLeft;
   const visibleTop = sourceFrame.scrollTop;

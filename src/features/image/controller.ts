@@ -6,17 +6,21 @@ import { clearOutputBytes, type OutputRuntime } from '../../app/runtime/outputRu
 import type { Rotation } from '../../app/state';
 import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import type { PicaResizer } from '../../infra/canvas/picaResize';
-import { buildImageRenderPlan, getImageAnalysisRegion } from '../../domain/geometry';
+import {
+  buildImageRenderPlan,
+  computeEditorGeometry,
+  getImageAnalysisRegion,
+  type EditorGeometry,
+} from '../../domain/geometry';
 import { buildUintHistogram } from '../../domain/histogram';
 import { buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
 import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/imageLoader';
 import { renderHistogram } from '../../infra/canvas/histogramRenderer';
-import { stepDownscaleAndResize } from '../../infra/canvas/picaResize';
 import { renderIndexedPreview } from '../../infra/canvas/previewRenderer';
 import { renderImageBaseRaster } from './service';
 import { applyCropBoxToDom } from './cropBox';
-import { buildRotatedSource, getSourceImage, srcH, srcW } from './source';
-import { createImageWorkerClient, type ImageWorkerClient } from '../../infra/worker/imageWorkerClient';
+import { buildRotatedSource, getSourceImage, srcH, srcW, type SourceImage } from './source';
+import type { ImageWorkerClient } from '../../infra/worker/imageWorkerClient';
 
 export type ImageController = {
   loadImageFile(file: File): Promise<void>;
@@ -28,6 +32,8 @@ export type ImageController = {
   refreshTransformedSource(): Promise<void>;
   setRotation(rotation: Rotation): void;
   setZoom(zoom: number): void;
+  applyEditorZoom(targetZoom: number, anchorClientX?: number, anchorClientY?: number): void;
+  getMaxEditorZoom(): number;
   toggleMirrorH(): void;
   toggleMirrorV(): void;
 };
@@ -161,6 +167,95 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     }
   }
 
+  type ScrollAnchor = { kind: 'box' } | { kind: 'point'; clientX: number; clientY: number };
+
+  function redrawSourceCanvas(src: SourceImage, w: number, h: number): void {
+    deps.dom.sourceCanvas.width = w;
+    deps.dom.sourceCanvas.height = h;
+    const ctx = getContext2d(deps.dom.sourceCanvas);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, 0, 0, w, h);
+  }
+
+  function geometryFor(zoom: number, src: SourceImage): { sourceW: number; sourceH: number; geom: EditorGeometry } {
+    const state = getState();
+    const sourceW = srcW(src);
+    const sourceH = srcH(src);
+    return {
+      sourceW,
+      sourceH,
+      geom: computeEditorGeometry({
+        mode: state.image.mode,
+        sourceW,
+        sourceH,
+        targetW: state.device.targetW,
+        targetH: state.device.targetH,
+        frameMaxW: MAX_EDITOR_WIDTH,
+        frameMaxH: MAX_EDITOR_HEIGHT,
+        editorZoom: zoom,
+      }),
+    };
+  }
+
+  function applyGeometry(src: SourceImage, sourceW: number, sourceH: number, geom: EditorGeometry, anchor: ScrollAnchor): void {
+    const state = getState();
+    const oldDisplay = deps.runtime.displayScale || geom.displayScale;
+    const frame = deps.dom.sourceFrame;
+
+    let anchorFx = 0;
+    let anchorFy = 0;
+    let anchorSx = 0;
+    let anchorSy = 0;
+    if (anchor.kind === 'point') {
+      const rect = frame.getBoundingClientRect();
+      anchorFx = anchor.clientX - rect.left;
+      anchorFy = anchor.clientY - rect.top;
+      anchorSx = (anchorFx + frame.scrollLeft) / oldDisplay;
+      anchorSy = (anchorFy + frame.scrollTop) / oldDisplay;
+    }
+
+    const prevCenterX = deps.runtime.boxW > 0
+      ? (deps.runtime.boxX + deps.runtime.boxW / 2) / oldDisplay
+      : sourceW / 2;
+    const prevCenterY = deps.runtime.boxH > 0
+      ? (deps.runtime.boxY + deps.runtime.boxH / 2) / oldDisplay
+      : sourceH / 2;
+
+    deps.runtime.displayScale = geom.displayScale;
+    deps.runtime.workScale = geom.workScale;
+    deps.runtime.dispImgW = geom.dispImgW;
+    deps.runtime.dispImgH = geom.dispImgH;
+    deps.runtime.boxW = Math.min((state.device.targetW / geom.workScale) * geom.displayScale, geom.dispImgW);
+    deps.runtime.boxH = Math.min((state.device.targetH / geom.workScale) * geom.displayScale, geom.dispImgH);
+    deps.runtime.boxX = prevCenterX * geom.displayScale - deps.runtime.boxW / 2;
+    deps.runtime.boxY = prevCenterY * geom.displayScale - deps.runtime.boxH / 2;
+
+    redrawSourceCanvas(src, geom.dispImgW, geom.dispImgH);
+    frame.style.width = `${Math.min(geom.dispImgW, MAX_EDITOR_WIDTH)}px`;
+    frame.style.height = `${Math.min(geom.dispImgH, MAX_EDITOR_HEIGHT)}px`;
+
+    if (state.image.mode === 'crop') {
+      applyCropBoxToDom({
+        runtime: deps.runtime,
+        cropBox: deps.dom.cropBox,
+        sourceFrame: frame,
+        scrollIntoView: anchor.kind === 'box',
+      });
+    }
+    if (anchor.kind === 'point') {
+      frame.scrollLeft = anchorSx * geom.displayScale - anchorFx;
+      frame.scrollTop = anchorSy * geom.displayScale - anchorFy;
+    }
+  }
+
+  function getMaxEditorZoom(): number {
+    if (!deps.runtime.loadedImg) return 1;
+    const state = getState();
+    const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
+    return geometryFor(state.image.editorZoom, src).geom.maxZoom;
+  }
+
   async function resetEditor(): Promise<void> {
     const state = getState();
     if (state.image.rotation !== 0 || state.image.mirrorH || state.image.mirrorV) {
@@ -168,43 +263,30 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     }
 
     const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
-    const sourceWidth = srcW(src);
-    const sourceHeight = srcH(src);
-
-    const baseScale = Math.min(MAX_EDITOR_WIDTH / sourceWidth, MAX_EDITOR_HEIGHT / sourceHeight);
-    deps.runtime.displayScale = Math.min(baseScale * state.image.editorZoom, 1.0);
-    deps.runtime.dispImgW = Math.round(sourceWidth * deps.runtime.displayScale);
-    deps.runtime.dispImgH = Math.round(sourceHeight * deps.runtime.displayScale);
-
-    deps.runtime.workScale = state.image.mode === 'crop'
-      ? Math.max(state.device.targetW / sourceWidth, state.device.targetH / sourceHeight)
-      : Math.min(state.device.targetW / sourceWidth, state.device.targetH / sourceHeight);
-
-    const prevCenterX = deps.runtime.boxW > 0
-      ? (deps.runtime.boxX + deps.runtime.boxW / 2) / deps.runtime.displayScale
-      : sourceWidth / 2;
-    const prevCenterY = deps.runtime.boxH > 0
-      ? (deps.runtime.boxY + deps.runtime.boxH / 2) / deps.runtime.displayScale
-      : sourceHeight / 2;
-
-    deps.runtime.boxW = Math.min((state.device.targetW / deps.runtime.workScale) * deps.runtime.displayScale, deps.runtime.dispImgW);
-    deps.runtime.boxH = Math.min((state.device.targetH / deps.runtime.workScale) * deps.runtime.displayScale, deps.runtime.dispImgH);
-    deps.runtime.boxX = prevCenterX * deps.runtime.displayScale - deps.runtime.boxW / 2;
-    deps.runtime.boxY = prevCenterY * deps.runtime.displayScale - deps.runtime.boxH / 2;
-
-    deps.dom.sourceCanvas.width = deps.runtime.dispImgW;
-    deps.dom.sourceCanvas.height = deps.runtime.dispImgH;
-    await stepDownscaleAndResize(deps.pica, src, deps.dom.sourceCanvas);
-    deps.dom.sourceFrame.style.width = `${Math.min(deps.runtime.dispImgW, MAX_EDITOR_WIDTH)}px`;
-    deps.dom.sourceFrame.style.height = `${Math.min(deps.runtime.dispImgH, MAX_EDITOR_HEIGHT)}px`;
-
-    if (state.image.mode === 'crop') {
-      deps.clearSnap();
-      applyCropBoxToDom({ runtime: deps.runtime, cropBox: deps.dom.cropBox, sourceFrame: deps.dom.sourceFrame });
-    } else {
-      deps.clearSnap();
+    const { sourceW, sourceH, geom } = geometryFor(state.image.editorZoom, src);
+    if (geom.clampedZoom !== state.image.editorZoom) {
+      deps.store.dispatch(actions.imageSetEditorZoom(geom.clampedZoom));
     }
+    deps.clearSnap();
+    applyGeometry(src, sourceW, sourceH, geom, { kind: 'box' });
+    rasterDirty = true;
+    requestConvert();
+  }
 
+  function applyEditorZoom(targetZoom: number, anchorClientX?: number, anchorClientY?: number): void {
+    if (!deps.runtime.loadedImg) return;
+    const state = getState();
+    const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
+    const { sourceW, sourceH, geom } = geometryFor(targetZoom, src);
+    if (geom.clampedZoom === state.image.editorZoom && deps.runtime.dispImgW === geom.dispImgW) return;
+
+    const anchor: ScrollAnchor = anchorClientX !== undefined && anchorClientY !== undefined
+      ? { kind: 'point', clientX: anchorClientX, clientY: anchorClientY }
+      : { kind: 'box' };
+    applyGeometry(src, sourceW, sourceH, geom, anchor);
+    if (geom.clampedZoom !== state.image.editorZoom) {
+      deps.store.dispatch(actions.imageSetEditorZoom(geom.clampedZoom));
+    }
     rasterDirty = true;
     requestConvert();
   }
@@ -336,6 +418,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     refreshTransformedSource,
     setRotation,
     setZoom,
+    applyEditorZoom,
+    getMaxEditorZoom,
     toggleMirrorH,
     toggleMirrorV,
   };

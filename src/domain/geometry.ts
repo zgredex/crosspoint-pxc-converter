@@ -24,6 +24,44 @@ export type ImageAnalysisRegion = {
   pixelCount: number;
 };
 
+export type EditorGeometry = {
+  maxZoom: number;
+  clampedZoom: number;
+  displayScale: number;
+  workScale: number;
+  dispImgW: number;
+  dispImgH: number;
+};
+
+const FIT_MODE_MAX_ZOOM = 8;
+
+export function computeEditorGeometry(params: {
+  mode: 'crop' | 'fit';
+  sourceW: number;
+  sourceH: number;
+  targetW: number;
+  targetH: number;
+  frameMaxW: number;
+  frameMaxH: number;
+  editorZoom: number;
+}): EditorGeometry {
+  const baseDisplayScale = Math.min(params.frameMaxW / params.sourceW, params.frameMaxH / params.sourceH);
+  const baseCropScale = Math.max(params.targetW / params.sourceW, params.targetH / params.sourceH);
+  const fitScale = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
+  const maxZoom = params.mode === 'crop' ? Math.max(1, 1 / baseCropScale) : FIT_MODE_MAX_ZOOM;
+  const clampedZoom = Math.min(Math.max(1, params.editorZoom), maxZoom);
+  const displayScale = baseDisplayScale * clampedZoom;
+  const workScale = params.mode === 'crop' ? baseCropScale * clampedZoom : fitScale;
+  return {
+    maxZoom,
+    clampedZoom,
+    displayScale,
+    workScale,
+    dispImgW: Math.round(params.sourceW * displayScale),
+    dispImgH: Math.round(params.sourceH * displayScale),
+  };
+}
+
 export function fitOffset(fw: number, fh: number, targetW: number, targetH: number, pos: FitAlign): { x: number; y: number } {
   const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (targetW - fw) / 2 : targetW - fw;
   const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (targetH - fh) / 2 : targetH - fh;

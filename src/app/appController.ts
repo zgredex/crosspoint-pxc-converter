@@ -42,7 +42,7 @@ type AppControllerDeps = {
   gbController: GbController;
 };
 
-const IMAGE_ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4] as const;
+const IMAGE_ZOOM_STEP = 1.25;
 
 export function createAppController(deps: AppControllerDeps): AppController {
   function resizeOutputCanvases(): void {
@@ -156,13 +156,11 @@ export function createAppController(deps: AppControllerDeps): AppController {
       return;
     }
 
-    const currentIndex = IMAGE_ZOOM_STEPS.indexOf(state.image.editorZoom as (typeof IMAGE_ZOOM_STEPS)[number]);
-    if (currentIndex === -1) return;
-
-    const nextIndex = direction === 'in' ? currentIndex + 1 : currentIndex - 1;
-    if (nextIndex >= 0 && nextIndex < IMAGE_ZOOM_STEPS.length) {
-      deps.imageController.setZoom(IMAGE_ZOOM_STEPS[nextIndex]);
-    }
+    const maxZoom = deps.imageController.getMaxEditorZoom();
+    const factor = direction === 'in' ? IMAGE_ZOOM_STEP : 1 / IMAGE_ZOOM_STEP;
+    const next = Math.min(Math.max(1, state.image.editorZoom * factor), maxZoom);
+    if (Math.abs(next - state.image.editorZoom) < 1e-4) return;
+    deps.imageController.applyEditorZoom(next);
   }
 
   function downloadPxc(): void {

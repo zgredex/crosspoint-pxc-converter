@@ -10,9 +10,14 @@ type BoxState = {
 type CropInteractionDeps = {
   cropBox: HTMLDivElement;
   sourceCanvas: HTMLCanvasElement;
+  sourceFrame: HTMLDivElement;
   snapGuideH: HTMLDivElement;
   snapGuideV: HTMLDivElement;
   snapThreshold: number;
+  wheelZoomK: number;
+  isImageLoaded: () => boolean;
+  getEditorZoom: () => number;
+  applyEditorZoom: (targetZoom: number, anchorClientX?: number, anchorClientY?: number) => void;
   getMode: () => 'crop' | 'fit';
   getBoxState: () => BoxState;
   setBoxPosition: (x: number, y: number) => void;
@@ -82,6 +87,13 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     window.setTimeout(clearSnap, 600);
     deps.scheduleConvert();
   }
+
+  deps.sourceFrame.addEventListener('wheel', event => {
+    if (!deps.isImageLoaded()) return;
+    event.preventDefault();
+    const factor = Math.exp(-event.deltaY * deps.wheelZoomK);
+    deps.applyEditorZoom(deps.getEditorZoom() * factor, event.clientX, event.clientY);
+  }, { passive: false });
 
   deps.cropBox.addEventListener('mousedown', onDragStart);
   deps.cropBox.addEventListener('touchstart', onDragStart, { passive: false });
