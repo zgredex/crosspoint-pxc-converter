@@ -85,8 +85,9 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.rotateValEl.textContent = `${state.loadedType === 'gb' ? state.gb.rotation : state.image.rotation}°`;
 
   const isImage = state.loadedType === 'image';
+  const isFit = isImage && state.image.mode === 'fit';
   const zoomLocked = isImage && state.image.editorMaxZoom <= 1.0001;
-  if (!isImage) {
+  if (!isImage || isFit) {
     dom.zoomHint.hidden = true;
     dom.zoomHint.textContent = '';
   } else {

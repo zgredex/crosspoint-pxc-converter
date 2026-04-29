@@ -33,8 +33,6 @@ export type EditorGeometry = {
   dispImgH: number;
 };
 
-const FIT_MODE_MAX_ZOOM = 8;
-
 export function computeEditorGeometry(params: {
   mode: 'crop' | 'fit';
   sourceW: number;
@@ -48,7 +46,7 @@ export function computeEditorGeometry(params: {
   const baseDisplayScale = Math.min(params.frameMaxW / params.sourceW, params.frameMaxH / params.sourceH);
   const baseCropScale = Math.max(params.targetW / params.sourceW, params.targetH / params.sourceH);
   const fitScale = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
-  const maxZoom = params.mode === 'crop' ? Math.max(1, 1 / baseCropScale) : FIT_MODE_MAX_ZOOM;
+  const maxZoom = params.mode === 'crop' ? Math.max(1, 1 / baseCropScale) : 1;
   const clampedZoom = Math.min(Math.max(1, params.editorZoom), maxZoom);
   const displayScale = baseDisplayScale * clampedZoom;
   const workScale = params.mode === 'crop' ? baseCropScale * clampedZoom : fitScale;
