@@ -18,7 +18,7 @@ import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/ima
 import { renderHistogram } from '../../infra/canvas/histogramRenderer';
 import { renderIndexedPreview } from '../../infra/canvas/previewRenderer';
 import { renderImageBaseRaster } from './service';
-import { applyCropBoxToDom } from './cropBox';
+import { applyCropBoxToDom, nudgeCropBoxIntoView } from './cropBox';
 import { buildRotatedSource, getSourceImage, srcH, srcW, type SourceImage } from './source';
 import type { ImageWorkerClient } from '../../infra/worker/imageWorkerClient';
 
@@ -252,6 +252,10 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (anchor.kind === 'point') {
       frame.scrollLeft = anchorSx * geom.displayScale - anchorFx;
       frame.scrollTop = anchorSy * geom.displayScale - anchorFy;
+
+      if (state.image.mode === 'crop') {
+        nudgeCropBoxIntoView({ runtime: deps.runtime, sourceFrame: frame, margin: 0 });
+      }
     }
 
     if (Math.abs(state.image.editorMaxZoom - geom.maxZoom) > 1e-4) {

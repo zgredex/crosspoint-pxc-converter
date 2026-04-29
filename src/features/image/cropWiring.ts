@@ -2,7 +2,7 @@ import type { AppStore } from '../../app/store';
 import type { AppDom } from '../../ui/dom';
 import { setupCropInteraction } from '../../ui/cropInteraction';
 import type { ImageRuntime } from '../../app/runtime/imageRuntime';
-import { applyCropBoxToDom } from './cropBox';
+import { applyCropBoxToDom, nudgeCropBoxIntoView as nudgeCropBox } from './cropBox';
 
 const SNAP_THRESHOLD = 9;
 const WHEEL_ZOOM_K = 0.0015;
@@ -41,10 +41,16 @@ export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: ()
       deps.runtime.boxX = x;
       deps.runtime.boxY = y;
     },
-    applyCropBox: () => applyCropBoxToDom({
+    applyCropBox: scrollIntoView => applyCropBoxToDom({
       runtime: deps.runtime,
       cropBox: deps.dom.cropBox,
       sourceFrame: deps.dom.sourceFrame,
+      scrollIntoView,
+    }),
+    nudgeCropBoxIntoView: margin => nudgeCropBox({
+      runtime: deps.runtime,
+      sourceFrame: deps.dom.sourceFrame,
+      margin,
     }),
     scheduleConvert: () => {
       deps.invalidateBaseRaster();

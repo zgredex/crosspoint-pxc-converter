@@ -21,7 +21,8 @@ type CropInteractionDeps = {
   getMode: () => 'crop' | 'fit';
   getBoxState: () => BoxState;
   setBoxPosition: (x: number, y: number) => void;
-  applyCropBox: () => void;
+  applyCropBox: (scrollIntoView?: boolean) => void;
+  nudgeCropBoxIntoView: (margin?: number) => void;
   scheduleConvert: () => void;
 };
 
@@ -32,6 +33,8 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
   let dragStartY = 0;
   let dragStartBX = 0;
   let dragStartBY = 0;
+  let dragStartScrollLeft = 0;
+  let dragStartScrollTop = 0;
 
   function clearSnap(): void {
     deps.snapGuideH.classList.remove('active');
@@ -49,7 +52,14 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
       : { x: event.clientX, y: event.clientY };
   }
 
+  function onDragKeydown(event: KeyboardEvent): void {
+    if (!isDragging) return;
+    if (event.code !== 'Space' && event.key !== ' ' && event.key !== 'Spacebar') return;
+    event.preventDefault();
+  }
+
   function onDragStart(event: MouseEvent | TouchEvent): void {
+    if (isDragging) return;
     if (deps.getMode() !== 'crop') return;
     event.preventDefault();
     isDragging = true;
@@ -61,6 +71,10 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     dragStartY = point.y;
     dragStartBX = boxX;
     dragStartBY = boxY;
+    dragStartScrollLeft = deps.sourceFrame.scrollLeft;
+    dragStartScrollTop = deps.sourceFrame.scrollTop;
+
+    window.addEventListener('keydown', onDragKeydown, { capture: true });
   }
 
   function onDragMove(event: MouseEvent | TouchEvent): void {
@@ -70,15 +84,18 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
 
     const point = clientXY(event);
     const { dispImgW, dispImgH, boxW, boxH } = deps.getBoxState();
-    const rawX = dragStartBX + (point.x - dragStartX);
-    const rawY = dragStartBY + (point.y - dragStartY);
+    const scrollDx = deps.sourceFrame.scrollLeft - dragStartScrollLeft;
+    const scrollDy = deps.sourceFrame.scrollTop - dragStartScrollTop;
+    const rawX = dragStartBX + (point.x - dragStartX) + scrollDx;
+    const rawY = dragStartBY + (point.y - dragStartY) + scrollDy;
     const centerX = (dispImgW - boxW) / 2;
     const centerY = (dispImgH - boxH) / 2;
     const snapH = Math.abs(rawX - centerX) < deps.snapThreshold;
     const snapV = Math.abs(rawY - centerY) < deps.snapThreshold;
 
     deps.setBoxPosition(snapH ? centerX : rawX, snapV ? centerY : rawY);
-    deps.applyCropBox();
+    deps.applyCropBox(false);
+    deps.nudgeCropBoxIntoView(0);
     deps.snapGuideH.style.top = `${dispImgH / 2}px`;
     deps.snapGuideH.style.width = `${dispImgW}px`;
     deps.snapGuideV.style.left = `${dispImgW / 2}px`;
@@ -92,6 +109,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
   function onDragEnd(): void {
     if (!isDragging) return;
     isDragging = false;
+    window.removeEventListener('keydown', onDragKeydown, { capture: true });
     window.setTimeout(clearSnap, 600);
     deps.scheduleConvert();
   }
@@ -109,6 +127,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
   window.addEventListener('touchmove', onDragMove, { passive: false });
   window.addEventListener('mouseup', onDragEnd);
   window.addEventListener('touchend', onDragEnd);
+  window.addEventListener('touchcancel', onDragEnd);
 
   deps.sourceCanvas.addEventListener('click', event => {
     if (deps.getMode() !== 'crop') return;
