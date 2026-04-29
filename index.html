@@ -77,7 +77,7 @@
       <div class="settings-col">
 
         <div class="panel-section">
-          <p class="panel-heading">XTeink</p>
+          <p class="panel-heading">XTeink<button class="help-tip" type="button" data-tip="Pick your CrossPoint device. X3 outputs 528×792 pixels, X4 outputs 480×800." aria-label="About XTeink device">?</button></p>
           <div class="pill-group">
             <button class="pill" id="x3Btn" data-xt="x3">X3</button>
             <button class="pill active" id="x4Btn" data-xt="x4">X4</button>
@@ -85,7 +85,7 @@
         </div>
 
         <div class="panel-section" id="scaleSection">
-          <p class="panel-heading">Scale</p>
+          <p class="panel-heading">Scale<button class="help-tip" type="button" data-tip="Fit shows the whole image with empty space filled by the background. Crop selects a region of the source to fill the device exactly." aria-label="About scale mode">?</button></p>
           <div class="pill-group">
             <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
             <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
@@ -93,7 +93,7 @@
         </div>
 
         <div class="panel-section disabled" id="posSection">
-          <p class="panel-heading">Position on screen</p>
+          <p class="panel-heading">Position on screen<button class="help-tip" type="button" data-tip="Where to place the image on the device when Fit leaves empty space around it." aria-label="About position">?</button></p>
           <div class="pos-grid">
             <button class="pos-btn" data-pos="tl" title="Top left"></button>
             <button class="pos-btn" data-pos="tc" title="Top centre"></button>
@@ -105,7 +105,7 @@
             <button class="pos-btn" data-pos="bc" title="Bottom centre"></button>
             <button class="pos-btn" data-pos="br" title="Bottom right"></button>
           </div>
-          <p class="panel-heading" style="margin-top: 10px;">Background</p>
+          <p class="panel-heading" style="margin-top: 10px;">Background<button class="help-tip" type="button" data-tip="Color used to fill the empty space around a Fit image." aria-label="About fit background color">?</button></p>
           <div class="pill-group">
             <button class="pill active" data-bg="white">White</button>
             <button class="pill" data-bg="black">Black</button>
@@ -113,7 +113,7 @@
         </div>
 
         <div class="panel-section">
-          <p class="panel-heading">Rotation</p>
+          <p class="panel-heading">Rotation<button class="help-tip" type="button" data-tip="Rotate the source 90° at a time before cropping or fitting." aria-label="About rotation">?</button></p>
           <div class="rotate-group">
             <button class="rotate-btn" id="rotateCCW" title="Rotate 90° counter-clockwise">↺</button>
             <span class="rotate-val" id="rotateVal">0°</span>
@@ -122,7 +122,7 @@
         </div>
 
         <div class="panel-section" id="mirrorSection">
-          <p class="panel-heading">Mirror</p>
+          <p class="panel-heading">Mirror<button class="help-tip" type="button" data-tip="Flip the source left-to-right (H) or top-to-bottom (V)." aria-label="About mirror">?</button></p>
           <div class="mirror-group">
             <button class="mirror-btn" id="mirrorHBtn" title="Flip horizontal">⇆ H</button>
             <button class="mirror-btn" id="mirrorVBtn" title="Flip vertical">⇅ V</button>
@@ -132,7 +132,7 @@
         <div id="gbControls">
 
           <div class="panel-section">
-            <p class="panel-heading">BMP palette</p>
+            <p class="panel-heading">BMP palette<button class="help-tip" type="button" data-tip="Color scheme used when saving Game Boy captures as BMP. DMG is the classic green tint, Pocket is neutral grey, B&amp;W is pure black/white, SGB matches the Super Game Boy." aria-label="About GB BMP palette">?</button></p>
             <div class="pill-group pill-group--wrap">
               <button class="pill active" data-gbpalette="dmg">DMG</button>
               <button class="pill" data-gbpalette="pocket">Pocket</button>
@@ -142,7 +142,7 @@
           </div>
 
           <div class="panel-section">
-            <p class="panel-heading">Output scale</p>
+            <p class="panel-heading">Output scale<button class="help-tip" type="button" data-tip="Multiplier for the exported BMP size — 1× saves at the native pixel count, higher values produce a larger file with the same content." aria-label="About GB output scale">?</button></p>
             <div class="rotate-group">
               <button class="rotate-btn" id="gbScaleDownBtn">−</button>
               <span class="rotate-val" id="gbScaleVal">1×</span>
@@ -151,7 +151,7 @@
           </div>
 
           <div class="panel-section">
-            <p class="panel-heading">Background</p>
+            <p class="panel-heading">Background<button class="help-tip" type="button" data-tip="Color used behind the Game Boy frame in the exported BMP." aria-label="About GB background color">?</button></p>
             <div class="pill-group">
               <button class="pill active" data-bg="white">White</button>
               <button class="pill" data-bg="black">Black</button>
@@ -160,7 +160,7 @@
 
           <div class="panel-section">
             <div class="toggle-row">
-              <span class="toggle-label">Invert</span>
+              <span class="toggle-label">Invert<button class="help-tip" type="button" data-tip="Flip colors." aria-label="About GB invert">?</button></span>
               <label class="toggle">
                 <input type="checkbox" id="gbInvertToggle">
                 <span class="toggle-track"></span>
@@ -170,7 +170,7 @@
 
           <div class="panel-section" id="paletteInfo">
             <p class="panel-heading" style="font-size:0.6rem; margin-bottom:4px;">
-              GB Printer palette: <span id="paletteInfoVal">—</span>
+              GB Printer palette: <span id="paletteInfoVal">—</span><button class="help-tip" type="button" data-tip="Shows the grayscale levels the GB Printer text log encoded — read-only." aria-label="About GB Printer palette readout">?</button>
             </p>
           </div>
 
@@ -181,24 +181,24 @@
       <div class="settings-col">
 
         <div class="panel-section" id="histogramSection">
-          <p class="panel-heading">Histogram</p>
+          <p class="panel-heading">Histogram<button class="help-tip" type="button" data-tip="Brightness distribution of the area you'll export — left is dark, right is bright. Useful for picking black/white points." aria-label="About histogram">?</button></p>
           <canvas id="histogramCanvas"></canvas>
         </div>
 
         <div class="panel-section" id="toneRangeSection">
-          <p class="panel-heading">Tone Range</p>
+          <p class="panel-heading">Tone Range<button class="help-tip" type="button" data-tip="Maps source brightness onto the device's 4 grey levels. Adjust black, white, and gamma to control how the picture is exposed." aria-label="About tone range">?</button></p>
           <div class="tone-row">
-            <span class="tone-label">Black</span>
+            <span class="tone-label">Black<button class="help-tip" type="button" data-tip="Pixels at or below this brightness become pure black on the device." aria-label="About black point">?</button></span>
             <input type="range" id="blackSlider" class="tone-slider" min="0" max="255" value="0" step="1">
             <span class="tone-val" id="blackVal">0</span>
           </div>
           <div class="tone-row">
-            <span class="tone-label">White</span>
+            <span class="tone-label">White<button class="help-tip" type="button" data-tip="Pixels at or above this brightness become pure white on the device." aria-label="About white point">?</button></span>
             <input type="range" id="whiteSlider" class="tone-slider" min="0" max="255" value="255" step="1">
             <span class="tone-val" id="whiteVal">255</span>
           </div>
           <div class="tone-row">
-            <span class="tone-label">Gamma</span>
+            <span class="tone-label">Gamma<button class="help-tip" type="button" data-tip="Lifts or darkens midtones without clipping pure black or pure white. Below 1 darkens, above 1 brightens." aria-label="About gamma">?</button></span>
             <input type="range" id="gammaSlider" class="tone-slider" min="30" max="500" value="100" step="1">
             <span class="tone-val" id="gammaVal">1.00</span>
           </div>
@@ -209,7 +209,7 @@
         </div>
 
         <div class="panel-section">
-          <p class="panel-heading">Contrast</p>
+          <p class="panel-heading">Contrast<button class="help-tip" type="button" data-tip="Pull dark and light pixels apart (positive) or push them together (negative)." aria-label="About contrast">?</button></p>
           <div class="contrast-row">
             <input type="range" id="contrastSlider" class="contrast-slider" min="-100" max="100" value="0" step="1">
             <span class="contrast-val" id="contrastVal">0</span>
@@ -219,7 +219,7 @@
 
         <div class="panel-section">
           <div class="toggle-row">
-            <span class="toggle-label">Invert</span>
+            <span class="toggle-label">Invert<button class="help-tip" type="button" data-tip="Flip colors." aria-label="About invert">?</button></span>
             <label class="toggle">
               <input type="checkbox" id="invertToggle">
               <span class="toggle-track"></span>
@@ -229,7 +229,7 @@
 
         <div class="panel-section">
           <div class="toggle-row" style="margin-bottom: 10px;">
-            <span class="toggle-label">Dither</span>
+            <span class="toggle-label">Dither<button class="help-tip" type="button" data-tip="Simulates extra grey levels by mixing the device's 4 shades with patterned noise. Each algorithm has a different look — try a few to see which fits your image." aria-label="About dither">?</button></span>
             <label class="toggle">
               <input type="checkbox" id="ditherToggle" checked>
               <span class="toggle-track"></span>

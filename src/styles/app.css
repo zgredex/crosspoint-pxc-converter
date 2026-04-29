@@ -267,6 +267,64 @@ h1 {
 }
 .zoom-hint[hidden] { display: none; }
 
+.help-tip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.55rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: help;
+  padding: 0;
+  position: relative;
+  vertical-align: middle;
+  transition: color 0.1s, border-color 0.1s;
+}
+.help-tip:hover,
+.help-tip:focus-visible {
+  color: var(--text);
+  border-color: var(--muted);
+  outline: none;
+}
+.help-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  padding: 6px 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s;
+  z-index: 100;
+}
+.help-tip:hover::after,
+.help-tip:focus-visible::after {
+  opacity: 1;
+}
+
 /* Side panels */
 .side-panel {
   background: var(--panel);
@@ -713,7 +771,6 @@ footer code {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  overflow: hidden;
 }
 .settings-col + .settings-col {
   border-left: 1px solid var(--border);
