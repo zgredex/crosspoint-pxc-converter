@@ -13,7 +13,6 @@ import type { DeviceKey } from '../domain/devices';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
 import type { GbController } from '../features/gb/controller';
 import type { ImageController } from '../features/image/controller';
-import { selectGbDisplayScale } from '../features/gb/service';
 
 export type AppController = {
   handleDeviceChange(): void;
@@ -27,7 +26,7 @@ export type AppController = {
   setGbInvert(invert: boolean): void;
   unloadActive(): void;
   rotateActive(direction: 'cw' | 'ccw'): void;
-  zoomActive(direction: 'in' | 'out'): void;
+  setActiveZoom(zoom: number): void;
   downloadPxc(): void;
   downloadBmp(): void;
 };
@@ -41,8 +40,6 @@ type AppControllerDeps = {
   imageController: ImageController;
   gbController: GbController;
 };
-
-const IMAGE_ZOOM_STEP = 1.25;
 
 export function createAppController(deps: AppControllerDeps): AppController {
   function resizeOutputCanvases(): void {
@@ -144,21 +141,21 @@ export function createAppController(deps: AppControllerDeps): AppController {
     deps.imageController.setRotation(((state.image.rotation + delta) % 360) as 0 | 90 | 180 | 270);
   }
 
-  function zoomActive(direction: 'in' | 'out'): void {
+  function setActiveZoom(zoom: number): void {
     const state = deps.store.getState();
+    if (!Number.isFinite(zoom)) return;
 
     if (state.loadedType === 'gb') {
-      const currentScale = selectGbDisplayScale(state);
-      const nextZoom = direction === 'in'
-        ? Math.min(6, currentScale + 1)
-        : Math.max(1, currentScale - 1);
+      const nextZoom = Math.round(Math.min(6, Math.max(1, zoom)));
+      if (state.gb.zoom === nextZoom) return;
       deps.gbController.setZoom(nextZoom);
       return;
     }
 
+    if (state.loadedType !== 'image') return;
+
     const maxZoom = deps.imageController.getMaxEditorZoom();
-    const factor = direction === 'in' ? IMAGE_ZOOM_STEP : 1 / IMAGE_ZOOM_STEP;
-    const next = Math.min(Math.max(1, state.image.editorZoom * factor), maxZoom);
+    const next = Math.min(Math.max(1, zoom), maxZoom);
     if (Math.abs(next - state.image.editorZoom) < 1e-4) return;
     deps.imageController.applyEditorZoom(next);
   }
@@ -201,7 +198,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
     setGbInvert,
     unloadActive,
     rotateActive,
-    zoomActive,
+    setActiveZoom,
     downloadPxc,
     downloadBmp,
   };

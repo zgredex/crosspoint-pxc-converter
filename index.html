@@ -34,8 +34,8 @@
       <div class="source-header">
         <p class="section-label" id="sourceLabel">Source — drag to reposition</p>
         <div class="zoom-controls" id="zoomControls">
-          <button class="zoom-btn" id="zoomOutBtn">−</button>
-          <button class="zoom-btn" id="zoomInBtn">+</button>
+          <label for="zoomSlider" class="zoom-controls-label">Zoom</label>
+          <input id="zoomSlider" class="zoom-slider" type="range" min="1" max="1" step="0.01" value="1" aria-label="Editor zoom">
         </div>
         <button class="change-btn" id="changeBtn">Clear</button>
       </div>
@@ -270,6 +270,7 @@
 
 <footer>
   Place on SD card as <code>/sleep.pxc</code> | <code>/sleep.bmp</code> or inside <code>/.sleep/</code>
+  <p class="local-only-note">No upload, no server — all processing happens locally in your browser.</p>
 </footer>
 
 <canvas id="workCanvas" width="480" height="800" style="display:none"></canvas>

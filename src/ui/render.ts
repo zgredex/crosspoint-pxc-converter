@@ -1,4 +1,5 @@
 import type { AppState } from '../app/state';
+import { selectGbDisplayScale } from '../features/gb/service';
 import type { AppDom } from './dom';
 
 function getPanelSection(element: Element): HTMLElement {
@@ -85,8 +86,32 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.rotateValEl.textContent = `${state.loadedType === 'gb' ? state.gb.rotation : state.image.rotation}°`;
 
   const isImage = state.loadedType === 'image';
+  const isGb = state.loadedType === 'gb';
   const isFit = isImage && state.image.mode === 'fit';
   const zoomLocked = isImage && state.image.editorMaxZoom <= 1.0001;
+
+  if (isImage) {
+    const maxZoom = Math.max(1, state.image.editorMaxZoom);
+    dom.zoomSlider.min = '1';
+    dom.zoomSlider.max = String(maxZoom);
+    dom.zoomSlider.step = '0.01';
+    dom.zoomSlider.value = String(Math.min(maxZoom, Math.max(1, state.image.editorZoom)));
+    dom.zoomSlider.disabled = isFit || zoomLocked;
+  } else if (isGb) {
+    const gbZoom = state.gb.zoom > 0 ? state.gb.zoom : selectGbDisplayScale(state);
+    dom.zoomSlider.min = '1';
+    dom.zoomSlider.max = '6';
+    dom.zoomSlider.step = '1';
+    dom.zoomSlider.value = String(Math.min(6, Math.max(1, gbZoom)));
+    dom.zoomSlider.disabled = false;
+  } else {
+    dom.zoomSlider.min = '1';
+    dom.zoomSlider.max = '1';
+    dom.zoomSlider.step = '0.01';
+    dom.zoomSlider.value = '1';
+    dom.zoomSlider.disabled = true;
+  }
+
   if (!isImage || isFit) {
     dom.zoomHint.hidden = true;
     dom.zoomHint.textContent = '';
@@ -94,10 +119,10 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     const zoomText = `${state.image.editorZoom.toFixed(state.image.editorZoom < 10 ? 2 : 1)}×`;
     const message = zoomLocked
       ? "image isn't larger than the device output — zoom unavailable"
-      : 'scroll over the image to zoom';
+      : state.image.editorZoom >= state.image.editorMaxZoom - 1e-3
+        ? 'max zoom reached. further zoom locked to avoid upscaling'
+        : 'scroll or drag the slider to zoom';
     dom.zoomHint.hidden = false;
     dom.zoomHint.textContent = `${zoomText} · ${message}`;
   }
-  dom.zoomInBtn.disabled = zoomLocked;
-  dom.zoomOutBtn.disabled = zoomLocked || (isImage && state.image.editorZoom <= 1.0001);
 }

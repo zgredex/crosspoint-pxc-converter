@@ -128,7 +128,7 @@ bindRotationControls({
 
 bindZoomControls({
   dom,
-  onZoom: appController.zoomActive,
+  onZoomChange: appController.setActiveZoom,
 });
 
 bindFileInput({
