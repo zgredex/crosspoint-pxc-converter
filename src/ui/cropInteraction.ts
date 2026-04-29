@@ -37,6 +37,10 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     deps.snapGuideH.classList.remove('active');
     deps.snapGuideV.classList.remove('active');
     deps.cropBox.classList.remove('snapped');
+    deps.snapGuideH.style.top = '';
+    deps.snapGuideH.style.width = '';
+    deps.snapGuideV.style.left = '';
+    deps.snapGuideV.style.height = '';
   }
 
   function clientXY(event: MouseEvent | TouchEvent): { x: number; y: number } {
@@ -75,6 +79,10 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
 
     deps.setBoxPosition(snapH ? centerX : rawX, snapV ? centerY : rawY);
     deps.applyCropBox();
+    deps.snapGuideH.style.top = `${dispImgH / 2}px`;
+    deps.snapGuideH.style.width = `${dispImgW}px`;
+    deps.snapGuideV.style.left = `${dispImgW / 2}px`;
+    deps.snapGuideV.style.height = `${dispImgH}px`;
     deps.snapGuideV.classList.toggle('active', snapH);
     deps.snapGuideH.classList.toggle('active', snapV);
     deps.cropBox.classList.toggle('snapped', snapH || snapV);

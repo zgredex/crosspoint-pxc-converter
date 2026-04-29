@@ -103,11 +103,17 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   }
 
   function toggleMirrorH(): void {
+    if (deps.runtime.loadedImg && deps.runtime.dispImgW > 0) {
+      deps.runtime.boxX = deps.runtime.dispImgW - deps.runtime.boxX - deps.runtime.boxW;
+    }
     deps.store.dispatch(actions.imageToggleMirrorH());
     if (deps.runtime.loadedImg) void refreshTransformedSource();
   }
 
   function toggleMirrorV(): void {
+    if (deps.runtime.loadedImg && deps.runtime.dispImgH > 0) {
+      deps.runtime.boxY = deps.runtime.dispImgH - deps.runtime.boxY - deps.runtime.boxH;
+    }
     deps.store.dispatch(actions.imageToggleMirrorV());
     if (deps.runtime.loadedImg) void refreshTransformedSource();
   }
@@ -246,6 +252,10 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (anchor.kind === 'point') {
       frame.scrollLeft = anchorSx * geom.displayScale - anchorFx;
       frame.scrollTop = anchorSy * geom.displayScale - anchorFy;
+    }
+
+    if (Math.abs(state.image.editorMaxZoom - geom.maxZoom) > 1e-4) {
+      deps.store.dispatch(actions.imageSetEditorMaxZoom(geom.maxZoom));
     }
   }
 

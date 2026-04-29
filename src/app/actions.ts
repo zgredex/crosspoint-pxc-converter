@@ -23,6 +23,7 @@ export type AppAction =
   | { type: 'image/toggleMirrorH' }
   | { type: 'image/toggleMirrorV' }
   | { type: 'image/setEditorZoom'; editorZoom: number }
+  | { type: 'image/setEditorMaxZoom'; editorMaxZoom: number }
   | { type: 'image/resetAll' }
   | { type: 'gb/setPalette'; paletteKey: GbPaletteKey }
   | { type: 'gb/setInvert'; invert: boolean }
@@ -57,6 +58,7 @@ export const actions = {
   imageToggleMirrorH: (): AppAction => ({ type: 'image/toggleMirrorH' }),
   imageToggleMirrorV: (): AppAction => ({ type: 'image/toggleMirrorV' }),
   imageSetEditorZoom: (editorZoom: number): AppAction => ({ type: 'image/setEditorZoom', editorZoom }),
+  imageSetEditorMaxZoom: (editorMaxZoom: number): AppAction => ({ type: 'image/setEditorMaxZoom', editorMaxZoom }),
   imageResetAll: (): AppAction => ({ type: 'image/resetAll' }),
   gbSetPalette: (paletteKey: GbPaletteKey): AppAction => ({ type: 'gb/setPalette', paletteKey }),
   gbSetInvert: (invert: boolean): AppAction => ({ type: 'gb/setInvert', invert }),

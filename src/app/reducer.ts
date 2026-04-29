@@ -59,6 +59,8 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
       return { ...state, image: { ...state.image, mirrorV: !state.image.mirrorV } };
     case 'image/setEditorZoom':
       return { ...state, image: { ...state.image, editorZoom: action.editorZoom } };
+    case 'image/setEditorMaxZoom':
+      return { ...state, image: { ...state.image, editorMaxZoom: action.editorMaxZoom } };
     case 'image/resetAll':
       return { ...state, image: initialImageState };
     case 'gb/setPalette':

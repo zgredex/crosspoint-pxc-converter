@@ -50,7 +50,7 @@ export function createDom() {
     downloadBmpBtn: requiredElement<HTMLButtonElement>('downloadBmp'),
     zoomInBtn: requiredElement<HTMLButtonElement>('zoomInBtn'),
     zoomOutBtn: requiredElement<HTMLButtonElement>('zoomOutBtn'),
-    zoomLabelEl: requiredElement<HTMLSpanElement>('zoomLabel'),
+    zoomHint: requiredElement<HTMLParagraphElement>('zoomHint'),
     histogramCanvas: requiredElement<HTMLCanvasElement>('histogramCanvas'),
     gbSourceWrap: requiredElement<HTMLDivElement>('gbSourceWrap'),
     gbCanvas: requiredElement<HTMLCanvasElement>('gbCanvas'),

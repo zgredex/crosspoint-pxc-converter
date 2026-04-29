@@ -49,6 +49,7 @@ export type ImageState = {
   mirrorH: boolean;
   mirrorV: boolean;
   editorZoom: number;
+  editorMaxZoom: number;
 };
 
 export type GbState = {
@@ -98,6 +99,7 @@ export const initialImageState: ImageState = {
   mirrorH: false,
   mirrorV: false,
   editorZoom: 1.0,
+  editorMaxZoom: 1.0,
 };
 
 export const initialGbState: GbState = {

@@ -199,6 +199,11 @@ h1 {
   justify-content: center;
 }
 .zoom-btn:hover { color: var(--text); border-color: var(--muted); }
+.zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.zoom-btn:disabled:hover { color: var(--muted); border-color: var(--border2); }
 .zoom-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.6rem;
@@ -251,8 +256,16 @@ h1 {
   z-index: 10;
 }
 .snap-guide.active { opacity: 1; }
-#snapGuideH { height: 1px; left: 0; right: 0; top: 50%; margin-top: -.5px; }
-#snapGuideV { width: 1px; top: 0; bottom: 0; left: 50%; margin-left: -.5px; }
+#snapGuideH { height: 1px; left: 0; top: 0; }
+#snapGuideV { width: 1px; top: 0; left: 0; }
+
+.zoom-hint {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+}
+.zoom-hint[hidden] { display: none; }
 
 /* Side panels */
 .side-panel {

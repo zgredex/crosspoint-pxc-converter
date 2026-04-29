@@ -1,5 +1,4 @@
 import type { AppState } from '../app/state';
-import { selectGbDisplayScale } from '../features/gb/service';
 import type { AppDom } from './dom';
 
 function getPanelSection(element: Element): HTMLElement {
@@ -83,11 +82,21 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
       : 'Source';
   dom.cropBox.style.display = state.loadedType === 'image' && state.image.mode === 'crop' ? 'block' : 'none';
 
-  if (state.loadedType !== 'gb') {
-    dom.rotateValEl.textContent = `${state.image.rotation}°`;
-    dom.zoomLabelEl.textContent = `${state.image.editorZoom.toFixed(state.image.editorZoom < 10 ? 2 : 1)}×`;
+  dom.rotateValEl.textContent = `${state.loadedType === 'gb' ? state.gb.rotation : state.image.rotation}°`;
+
+  const isImage = state.loadedType === 'image';
+  const zoomLocked = isImage && state.image.editorMaxZoom <= 1.0001;
+  if (!isImage) {
+    dom.zoomHint.hidden = true;
+    dom.zoomHint.textContent = '';
   } else {
-    dom.rotateValEl.textContent = `${state.gb.rotation}°`;
-    dom.zoomLabelEl.textContent = `${selectGbDisplayScale(state)}×`;
+    const zoomText = `${state.image.editorZoom.toFixed(state.image.editorZoom < 10 ? 2 : 1)}×`;
+    const message = zoomLocked
+      ? "image isn't larger than the device output — zoom unavailable"
+      : 'scroll over the image to zoom';
+    dom.zoomHint.hidden = false;
+    dom.zoomHint.textContent = `${zoomText} · ${message}`;
   }
+  dom.zoomInBtn.disabled = zoomLocked;
+  dom.zoomOutBtn.disabled = zoomLocked || (isImage && state.image.editorZoom <= 1.0001);
 }
