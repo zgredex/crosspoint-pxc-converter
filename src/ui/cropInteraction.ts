@@ -28,6 +28,7 @@ type CropInteractionDeps = {
 
 export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: () => void } {
   let isDragging = false;
+  let isFrameHover = false;
   let didDrag = false;
   let dragStartX = 0;
   let dragStartY = 0;
@@ -52,9 +53,31 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
       : { x: event.clientX, y: event.clientY };
   }
 
-  function onDragKeydown(event: KeyboardEvent): void {
-    if (!isDragging) return;
-    if (event.code !== 'Space' && event.key !== ' ' && event.key !== 'Spacebar') return;
+  function isCropEditorActive(): boolean {
+    return deps.isImageLoaded() && deps.getMode() === 'crop';
+  }
+
+  function shouldCaptureEditorKeys(): boolean {
+    return isCropEditorActive() && (isDragging || isFrameHover);
+  }
+
+  function isScrollNavigationKey(event: KeyboardEvent): boolean {
+    return event.code === 'Space'
+      || event.key === ' '
+      || event.key === 'Spacebar'
+      || event.key === 'ArrowUp'
+      || event.key === 'ArrowDown'
+      || event.key === 'ArrowLeft'
+      || event.key === 'ArrowRight'
+      || event.key === 'PageUp'
+      || event.key === 'PageDown'
+      || event.key === 'Home'
+      || event.key === 'End';
+  }
+
+  function onEditorKeydown(event: KeyboardEvent): void {
+    if (!shouldCaptureEditorKeys()) return;
+    if (!isScrollNavigationKey(event)) return;
     event.preventDefault();
   }
 
@@ -73,8 +96,6 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     dragStartBY = boxY;
     dragStartScrollLeft = deps.sourceFrame.scrollLeft;
     dragStartScrollTop = deps.sourceFrame.scrollTop;
-
-    window.addEventListener('keydown', onDragKeydown, { capture: true });
   }
 
   function onDragMove(event: MouseEvent | TouchEvent): void {
@@ -109,9 +130,13 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
   function onDragEnd(): void {
     if (!isDragging) return;
     isDragging = false;
-    window.removeEventListener('keydown', onDragKeydown, { capture: true });
     window.setTimeout(clearSnap, 600);
     deps.scheduleConvert();
+  }
+
+  function onFrameScroll(): void {
+    if (!isCropEditorActive()) return;
+    deps.nudgeCropBoxIntoView(0);
   }
 
   deps.sourceFrame.addEventListener('wheel', event => {
@@ -120,6 +145,17 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     const factor = Math.exp(-event.deltaY * deps.wheelZoomK);
     deps.applyEditorZoom(deps.getEditorZoom() * factor, event.clientX, event.clientY);
   }, { passive: false });
+  deps.sourceFrame.addEventListener('scroll', onFrameScroll);
+  deps.sourceFrame.addEventListener('mouseenter', () => {
+    isFrameHover = true;
+  });
+  deps.sourceFrame.addEventListener('mouseleave', () => {
+    isFrameHover = false;
+  });
+  deps.sourceFrame.addEventListener('touchstart', () => {
+    isFrameHover = true;
+  }, { passive: true });
+  window.addEventListener('keydown', onEditorKeydown, { capture: true });
 
   deps.cropBox.addEventListener('mousedown', onDragStart);
   deps.cropBox.addEventListener('touchstart', onDragStart, { passive: false });
