@@ -94,7 +94,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     const maxZoom = Math.max(1, state.image.editorMaxZoom);
     dom.zoomSlider.min = '1';
     dom.zoomSlider.max = String(maxZoom);
-    dom.zoomSlider.step = '0.01';
+    dom.zoomSlider.step = 'any';
     dom.zoomSlider.value = String(Math.min(maxZoom, Math.max(1, state.image.editorZoom)));
     dom.zoomSlider.disabled = isFit || zoomLocked;
   } else if (isGb) {
@@ -117,9 +117,10 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     dom.zoomHint.textContent = '';
   } else {
     const zoomText = `${state.image.editorZoom.toFixed(state.image.editorZoom < 10 ? 2 : 1)}×`;
+    const atMaxZoom = state.image.editorZoom >= state.image.editorMaxZoom - 1e-2;
     const message = zoomLocked
       ? "image isn't larger than the device output — zoom unavailable"
-      : state.image.editorZoom >= state.image.editorMaxZoom - 1e-3
+      : atMaxZoom
         ? 'max zoom reached. further zoom locked to avoid upscaling'
         : 'scroll or drag the slider to zoom';
     dom.zoomHint.hidden = false;
