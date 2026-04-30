@@ -127,7 +127,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     const message = zoomLocked
       ? "image isn't larger than the device output — zoom unavailable"
       : atMaxZoom
-        ? 'max zoom reached. further zoom locked to avoid upscaling'
+        ? 'maximum zoom reached. further zoom is disabled to avoid upscaling'
         : 'scroll or drag the slider to zoom';
     dom.zoomHint.hidden = false;
     dom.zoomHint.textContent = `${zoomText} · ${message}`;
