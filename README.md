@@ -2,13 +2,24 @@
 
 **[crosspoint-pxc-converter.pages.dev](https://crosspoint-pxc-converter.pages.dev)**
 
-A browser-based image converter for creating sleep screen wallpapers for the [CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader) open-source e-reader firmware running on XTeink devices. Converts images (PNG, JPG, WebP, BMP, GIF) **and Game Boy 2BPP files** into **PXC** and **BMP** formats. No upload, no server — all processing happens locally in your browser.
+A browser-based converter that turns images and Game Boy 2BPP captures into sleep-screen wallpapers for the [CrossPoint](https://github.com/crosspoint-reader/crosspoint-reader) e-reader firmware running on XTeink devices. Inputs go in as PNG, JPG, WebP, BMP, GIF, `.2bpp`, `.bin`, `.gb`, or GB-Printer `.txt` logs; outputs come out as `.pxc` (CrossPoint native) or `.bmp` (4-bit indexed). Every step runs locally in the browser — no upload, no server.
 
 ---
 
-## PXC Format
+## Devices
 
-PXC is CrossPoint's native wallpaper format. It stores an image at 2 bits per pixel, giving four gray levels that map directly to the e-ink display's physical states:
+| Device | Resolution |
+|--------|-----------|
+| **X4** | 480×800 |
+| **X3** | 528×792 |
+
+The selected device controls the output canvas size for both export formats.
+
+---
+
+## PXC format
+
+PXC is CrossPoint's native wallpaper format. It stores 2 bits per pixel — four grey levels mapped one-to-one to the e-ink display's physical states.
 
 | Value | Display level | sRGB |
 |-------|--------------|------|
@@ -17,177 +28,181 @@ PXC is CrossPoint's native wallpaper format. It stores an image at 2 bits per pi
 | `2`   | Light grey   | 170  |
 | `3`   | White        | 255  |
 
-**File layout:**
+**File layout**
 
 ```
 Bytes 0–1   Width  (uint16 LE)
 Bytes 2–3   Height (uint16 LE)
-Bytes 4+    Pixel data — 2 bits per pixel, MSB first, row-major
-            Each byte holds 4 pixels: [p0 p1 p2 p3] in bits [7:6 5:4 3:2 1:0]
+Bytes 4+    Pixel data — 2 bits per pixel, MSB first, row-major.
+            Each byte holds 4 pixels: [p0 p1 p2 p3] in bits [7:6 5:4 3:2 1:0].
+            Each row is ceil(width / 4) bytes; rows are not packed across
+            boundaries.
 ```
 
-| Device | Resolution | File size |
-|--------|-----------|-----------|
-| X4     | 480×800   | 96,004 bytes |
-| X3     | 528×792   | 104,652 bytes |
+| Device | File size |
+|--------|----------|
+| X4     | 96,004 bytes |
+| X3     | 104,548 bytes |
 
 ---
 
-## BMP Format
+## BMP format
 
-The BMP export uses BMP3 (BITMAPINFOHEADER), 4-bit indexed colour.
+The BMP export uses BMP3 (`BITMAPINFOHEADER`), 4-bit indexed colour, with a 4-entry palette.
 
-- **Image mode** — 4-entry grayscale palette matching the four e-ink levels (`#000000 #555555 #AAAAAA #FFFFFF`). Compatible with ImageMagick's `-colorspace Gray -dither FloydSteinberg -remap palette.png -define bmp:format=bmp3 -type Palette` pipeline.
-- **Game Boy mode** — 4-entry palette using the selected GB colour scheme (DMG, Pocket, B&W, or SGB), so the BMP previews correctly on any viewer that shows colour.
+- **Image mode** — greyscale palette `#000000 #555555 #AAAAAA #FFFFFF`, matching the four e-ink levels and ImageMagick's `-colorspace Gray -dither FloydSteinberg -remap palette.png -define bmp:format=bmp3 -type Palette` pipeline.
+- **Game Boy mode** — palette pulled from the selected colour scheme (DMG, Pocket, B&W, or SGB) so the BMP previews correctly in any colour-aware viewer.
 
 ---
 
-## Where to put the file
+## Where to put the file on the device
 
 | Path on SD card    | Effect                                  |
 |--------------------|-----------------------------------------|
 | `/sleep.pxc`       | Single static sleep screen (PXC)        |
 | `/sleep.bmp`       | Single static sleep screen (BMP)        |
-| `/.sleep/name.pxc` | Rotated wallpaper pool (PXC)            |
-| `/.sleep/name.bmp` | Rotated wallpaper pool (BMP)            |
+| `/.sleep/name.pxc` | Member of the rotating wallpaper pool   |
+| `/.sleep/name.bmp` | Member of the rotating wallpaper pool   |
 
-CrossPoint picks from `/.sleep/` at random if multiple files are present. PXC and BMP files can be mixed in the same pool.
+CrossPoint picks at random from `/.sleep/` when multiple files are present. PXC and BMP files mix freely in the same pool.
 
 ---
 
 ## Features
 
-### Device support
-- **X4** — 480×800
-- **X3** — 528×792
+### Input
 
-### Image input
-- Drag and drop, click to browse, or **paste an image from clipboard** (Ctrl+V / Cmd+V)
-- Auto-detects file type: images go to image mode, `.2bpp` / `.bin` / `.gb` / `.txt` go to Game Boy mode
-- Invalid inputs and decode failures are shown inline in the app instead of failing silently
+- Drag-and-drop, click-to-browse, or paste from the clipboard (`Ctrl+V` / `Cmd+V`).
+- The loader inspects the file extension and routes automatically:
+  - `.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp`, `.gif` → image mode.
+  - `.2bpp`, `.bin`, `.gb` → Game Boy binary mode.
+  - `.txt` (or pasted text) → Game Boy Printer log parser.
+- Bad inputs (decode failure, malformed GB byte stream, unrecognised text payload) surface as an inline status banner.
 
-### Source editor (image mode)
-- **Crop mode** — drag or click to reposition the crop window; snap guides appear when aligned to centre
-- **Fit mode** — letterbox with configurable alignment (3×3 grid) and background colour (black or white)
-- **Rotation** — 90° CW / CCW steps
-- **Mirror** — flip horizontal or vertical
-- **Zoom controls** — 0.5×, 0.75×, 1×, 1.5×, 2×, 3×, 4× zoom for precise crop positioning on high-res images
-- Scrollable/pannable source view — navigate large images without scaling them down
-- Source preview rendered with **Lanczos3** — what you see in the editor reflects the actual downscaling quality
+### Source editor
 
-### Tone pipeline (image mode)
-Controls are arranged in processing order:
+- **Crop / Fit modes** — crop selects a viewport that fills the device exactly; fit letterboxes the whole source. The crop window snaps when its centre aligns with the source centre.
+- **Fit alignment** — 3×3 grid (top-left through bottom-right) controls placement of the letterboxed image. The unused area fills with the chosen background colour (white or black).
+- **Rotation** — 90° clockwise / counter-clockwise steps.
+- **Mirror** — horizontal and vertical flips, applied independently.
+- **Zoom** — continuous slider from 1× to a per-image maximum (capped so the source never upscales beyond its native pixels), plus mouse-wheel zoom anchored at the cursor.
+- **Scrollable viewport** — the source panel pans when the zoomed image exceeds its frame; scroll position is preserved during zoom changes.
+- **Source label** — displays the loaded asset's natural pixel dimensions, e.g. `Source · 1920×1080 — drag or click to reposition`.
+
+### Scaling
+
+Downscaling runs **Lanczos3** through [pica](https://github.com/nodeca/pica). For sources more than 2× the device target, the pipeline halves the image with high-quality bilinear smoothing until it lands within 2× of the target, then performs a single Lanczos3 pass to land exactly on the target dimensions. The same scaling path drives the editor preview and the export, so what shows on screen reflects the final output.
+
+### Tone pipeline
+
+Controls run in this processing order: black/white-point map → gamma → contrast → invert → dither.
 
 | Control | Description |
 |---------|-------------|
-| **Tone Range** | Black point, white point, and gamma sliders. **Auto** sets black/white points via histogram percentile clipping and resets gamma to 1.0. **Reset all** restores all three to defaults. |
-| **Contrast** | ±100 linear contrast adjustment, pivot at midpoint. |
-| **Invert** | Invert luminance before dithering. |
-| **Dither** | Toggle + algorithm selector (see below). |
+| **Black / White points** | 0–255 sliders that linearly remap the input range. Each clamps against the other so they cannot cross. |
+| **Gamma** | 0.30–3.00, default 1.00. Applies `Vout = Vin^(1/γ)` after the black/white remap. γ > 1 lifts shadows (brighter, more shadow detail); γ < 1 compresses shadows (darker, more highlight detail). |
+| **Contrast** | ±100 linear adjustment, pivoting at midpoint (128). |
+| **Invert** | Inverts luminance after tone mapping, before dithering. |
+| **Auto** | Sets black and white points from histogram percentile clipping; resets gamma to 1.00. |
+| **Reset all** | Restores black, white, and gamma to defaults. |
 
-**Tone Range — Gamma**
+### Dithering
 
-The gamma slider (0.30–3.00, default 1.00) remaps luminance non-linearly using `Vout = Vin^(1/γ)`:
-
-- **γ > 1** — lifts shadows disproportionately (brighter image, more shadow detail)
-- **γ < 1** — compresses shadows, pushes midtones toward highlights (darker image)
-- **γ = 1** — no change
-
-Gamma is applied after black/white point mapping and before contrast, so you can first set your tonal range with the black/white sliders, then use gamma to redistribute tones within that range.
-
-### Scaling (image mode)
-
-Images are downscaled using **Lanczos3** (via [pica](https://github.com/nodeca/pica)) with a post-resize unsharp mask (`amount 80, radius 0.6, threshold 2`). This applies to both the source editor preview and the output conversion, so the displayed crop is an accurate representation of the final result. Browser-default bilinear interpolation is not used.
-
-### Dithering (image mode)
-All error-diffusion algorithms use BT.601 luminance in sRGB space and quantise against sRGB palette values `[0, 85, 170, 255]`, matching ImageMagick's `-colorspace Gray` pipeline.
+Every error-diffusion algorithm uses BT.601 luminance in sRGB space and quantises against the palette `[0, 85, 170, 255]`, matching ImageMagick's `-colorspace Gray` pipeline.
 
 | Algorithm | Notes |
 |-----------|-------|
-| **Floyd-Steinberg** | Classic 4-neighbour kernel (`7/5/3/1 ÷ 16`). Good general balance. |
-| **Atkinson** | Distributes only 6/8 of the error across 6 neighbours. Preserves highlights, produces lighter images — popular for manga. |
-| **Jarvis (JJN)** | 3-row, 12-neighbour kernel (`÷ 48`). Spreads error wider, reduces banding at the cost of softer edges. |
-| **Stucki** | JJN-family with adjusted weights (`÷ 42`). Slightly sharper than Jarvis. |
-| **Burkes** | 2-row version of Stucki (`÷ 32`). Faster and still sharp. |
-| **Bayer** | 4×4 ordered (threshold) dithering. No error bleeding, produces a regular crosshatch pattern. Good for flat illustrations with hard edges. |
-| **Zhou-Fang** | JJN kernel with **serpentine scanning** — rows alternate left→right and right→left. Eliminates the directional "worm" artifacts that single-direction JJN produces. Generally the best choice for photographic content on e-ink. |
+| **Floyd-Steinberg** | Classic 4-neighbour kernel (`7/5/3/1 ÷ 16`). Balanced general-purpose default. |
+| **Atkinson** | Distributes only 6/8 of the error across 6 neighbours. Preserves highlights, produces lighter results — popular for manga. |
+| **Jarvis (JJN)** | 3-row, 12-neighbour kernel (`÷ 48`). Wider error spread, less banding, softer edges. |
+| **Stucki** | JJN-family weights (`÷ 42`). Slightly sharper than Jarvis. |
+| **Burkes** | 2-row Stucki (`÷ 32`). Faster than the 3-row variants while staying sharp. |
+| **Bayer** | 4×4 ordered (threshold) dithering. No error bleeding; produces a regular crosshatch suited to flat illustration with hard edges. |
+| **Blue Noise** | 64×64 pre-computed blue-noise threshold matrix. Ordered like Bayer but with high-frequency noise distribution; clean look on photographic content without the directional bias of error diffusion. |
+| **Zhou-Fang** | JJN kernel with serpentine scanning and intensity-dependent coefficient + threshold modulation (Zhou & Fang, SIGGRAPH 2003). Eliminates the "worm" artifacts of single-direction JJN. Strong choice for photographic content on e-ink. |
 
-### Histogram (image mode)
-Live tone distribution panel showing:
-- 256-bin luminance histogram of the processed image (after tone mapping, contrast, and invert — before dithering)
-- Four coloured zones corresponding to the display's four grey levels, each showing the percentage of pixels mapping to that output level
-- Solid palette colour strip (black / dark grey / light grey / white) for unambiguous zone identification
-- Threshold markers at 42, 127, 212
+A toggle disables dithering altogether for hard-quantised output.
 
-### Game Boy 2BPP mode
-Drop or browse a Game Boy 2BPP binary (`.2bpp`, `.bin`, `.gb`) or drop / browse / paste a **GB Printer text log** (`.txt` or plain text clipboard contents) to enter GB mode. The app auto-detects the input type.
+### Histogram
+
+A live tone-distribution panel renders alongside the preview:
+
+- 256-bin luminance histogram of the post-tone pre-dither buffer.
+- Four coloured zones corresponding to the four output levels, each labelled with the percentage of pixels that fall into it.
+- A solid palette colour strip below for unambiguous level identification.
+- Threshold markers drawn at 42, 127, and 212 — the boundaries between adjacent output levels.
+
+### Game Boy mode
+
+Game Boy binaries (`.2bpp`, `.bin`, `.gb`) and GB-Printer text logs (`.txt` files or pasted text) decode through a 2-bits-per-pixel tile reader at 20 tiles wide.
 
 | Control | Description |
 |---------|-------------|
-| **Output scale** | Integer pixel-perfect scaling of the GB art on the sleep screen: 1×, 2×, 3× … up to the maximum that fits the target resolution. The image is centred; unused area fills with the selected background colour. |
-| **Background** | White or black fill used for the unused area around centred GB output. |
-| **BMP palette** | Colour palette used for the `.bmp` export: DMG (green), Pocket (sepia), B&W (greyscale), SGB (purple/orange). The `.pxc` output is always greyscale. |
-| **Invert** | Flip GB colour indices (0↔3, 1↔2) before conversion. |
-| **Rotation** | 90° CW / CCW steps, same as image mode. |
+| **Output scale** | Integer pixel-perfect multiplier (1×, 2×, 3×, …) up to the maximum that still fits inside the device target. The scaled tile art centres on the canvas. |
+| **Background** | White or black fill behind the centred tile art. |
+| **BMP palette** | Colour scheme used for the `.bmp` export: DMG (green), Pocket (sepia/grey), B&W (greyscale), SGB (purple/orange). The `.pxc` export is always greyscale. |
+| **Invert** | Flips GB colour indices (`0↔3`, `1↔2`) before conversion. |
+| **Rotation** | 90° clockwise / counter-clockwise. |
 
-**GB Printer text log** support: paste the serial log from a GB Printer capture tool directly into the app, or load it from a `.txt` file. The parser reads hex byte lines and extracts the `PRNT` pallet register to apply the correct colour mapping automatically.
+The GB-Printer text-log parser reads hex byte lines and extracts the `PRNT` palette register, applying the captured grey levels automatically. The GB Printer palette readout reports the register value and the per-shade mapping in the file-info panel.
 
-**GB → e-ink mapping:**
+**GB index → PXC level**
 
-| GB index | Meaning | PXC level |
-|----------|---------|-----------|
-| 0 | Lightest | 3 (white) |
-| 1 | Light    | 2 (light grey) |
-| 2 | Dark     | 1 (dark grey) |
-| 3 | Darkest  | 0 (black) |
+| GB index | Meaning   | PXC level      |
+|----------|-----------|----------------|
+| 0        | Lightest  | 3 (white)      |
+| 1        | Light     | 2 (light grey) |
+| 2        | Dark      | 1 (dark grey)  |
+| 3        | Darkest   | 0 (black)      |
 
 ### Preview
-- Live preview updates on every change
-- 3.5× zoom loupe follows the cursor for pixel-level inspection
+
+- The output preview canvas updates live on every control change.
+- A 3.5× zoom loupe follows the cursor over the preview for pixel-level inspection.
 
 ### Export
-- **Download .pxc** — CrossPoint native format
-- **Download .bmp** — 4-bit indexed BMP (greyscale palette in image mode; GB colour palette in GB mode)
+
+- **Download .pxc** — CrossPoint native format.
+- **Download .bmp** — 4-bit indexed BMP3 (greyscale palette in image mode, GB colour palette in GB mode).
 
 ---
 
 ## Development
 
-### Local workflow
-
 ```bash
 npm install
-npm run dev
+npm run dev      # local dev server
+npm run build    # type-check and produce static dist/
+npm run test     # vitest run
 ```
 
-### Validation
+The build output in `dist/` is plain static files — HTML, JS chunks, CSS, and a worker bundle.
 
-```bash
-npm run build
-npm run test
-```
+### Hosting requirements
 
-### Architecture
+The dither pipeline runs in a Web Worker over a `SharedArrayBuffer`. Browsers allow that only inside a cross-origin-isolated context, so production hosting must serve the app with these response headers:
 
-- `src/app/` — app composition, store, reducer, runtime state containers, loader routing, and shared status/validation helpers
-- `src/domain/` — pure image, GB, histogram, dithering, geometry, and format logic
-- `src/features/` — image-mode and GB-mode controllers plus feature services/helpers
-- `src/infra/` — browser and canvas adapters
-- `src/ui/` — DOM refs, rendering, bindings, mode visibility, crop interaction, preview zoom, and UI event modules
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Embedder-Policy: require-corp`
 
-The app remains fully browser-side: no uploads, no server processing, and static-host deployment stays compatible with Cloudflare Pages.
+`public/_headers` ships the correct values for hosts that read that file format. On other hosts, configure the equivalent response-header rules in the host's own configuration.
 
-### Code map
+---
 
-- `src/app/bootstrap.ts` — composition root that wires the store, runtime containers, controllers, rendering, and UI bindings together
-- `src/app/runtime/*` — ephemeral runtime state for image, GB, and export sessions
-- `src/features/image/controller.ts` — image load/unload, editor reset, auto-levels, and conversion orchestration
-- `src/features/gb/controller.ts` — GB binary/printer-log loading, decode, source rendering, and output orchestration
-- `src/ui/render.ts` — store-driven DOM state synchronization for visible UI
-- `tests/` — Vitest coverage for app state, domain logic, and feature controllers/services
+## Architecture
+
+The codebase is plain DOM plus a hand-rolled flux-style store, organised into a one-directional layer chain:
+
+- **`src/domain/`** — pure logic with no DOM: geometry, tone, dithering, histogram, format encoders, GB decoders.
+- **`src/infra/`** — browser, canvas, worker, and file-IO adapters.
+- **`src/app/`** — store, reducer, runtime containers, top-level orchestration, loader routing, shared cleanup helpers.
+- **`src/features/{image,gb}/`** — feature controllers and helpers wired through deps.
+- **`src/ui/`** — DOM lookup, store-driven render, event bindings, crop interaction, preview loupe.
+
+`code-map.md` carries the full architectural contract: layer rules, single-source-of-truth registry, fluidity hot paths, and runtime-object documentation. Read it before non-trivial changes.
 
 ---
 
 ## Related
 
-- [CrossPoint firmware](https://github.com/crosspoint-reader/crosspoint-reader) — the e-reader firmware this tool targets
+- [CrossPoint firmware](https://github.com/crosspoint-reader/crosspoint-reader) — the e-reader firmware this tool targets.
