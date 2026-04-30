@@ -35,6 +35,11 @@ export type DeviceState = {
   totalPixels: number;
 };
 
+export type ImageDims = {
+  width: number;
+  height: number;
+};
+
 export type ImageState = {
   mode: 'crop' | 'fit';
   fitAlign: FitAlign;
@@ -50,6 +55,7 @@ export type ImageState = {
   mirrorV: boolean;
   editorZoom: number;
   editorMaxZoom: number;
+  sourceDims: ImageDims | null;
 };
 
 export type GbState = {
@@ -100,6 +106,7 @@ export const initialImageState: ImageState = {
   mirrorV: false,
   editorZoom: 1.0,
   editorMaxZoom: 1.0,
+  sourceDims: null,
 };
 
 export const initialGbState: GbState = {

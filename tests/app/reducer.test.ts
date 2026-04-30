@@ -88,6 +88,17 @@ describe('app reducer', () => {
     expect(clampedWhite.image.whitePoint).toBe(91);
   });
 
+  it('stores and clears the source dimensions', () => {
+    const set = reducer(initialAppState, actions.imageSetSourceDims({ width: 1920, height: 1080 }));
+    expect(set.image.sourceDims).toEqual({ width: 1920, height: 1080 });
+
+    const cleared = reducer(set, actions.imageSetSourceDims(null));
+    expect(cleared.image.sourceDims).toBeNull();
+
+    const reset = reducer(set, actions.imageResetAll());
+    expect(reset.image.sourceDims).toBeNull();
+  });
+
   it('stores and clears UI status messages', () => {
     const withMessage = reducer(initialAppState, actions.uiSetMessage('error', 'Bad input'));
 

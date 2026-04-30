@@ -2,7 +2,7 @@ import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { FitAlign } from '../domain/geometry';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
-import type { FitBackground, GbDims, GbFileInfo, LoadedType, Rotation, UiTone } from './state';
+import type { FitBackground, GbDims, GbFileInfo, ImageDims, LoadedType, Rotation, UiTone } from './state';
 
 export type AppAction =
   | { type: 'setLoadedType'; loadedType: LoadedType }
@@ -24,6 +24,7 @@ export type AppAction =
   | { type: 'image/toggleMirrorV' }
   | { type: 'image/setEditorZoom'; editorZoom: number }
   | { type: 'image/setEditorMaxZoom'; editorMaxZoom: number }
+  | { type: 'image/setSourceDims'; dims: ImageDims | null }
   | { type: 'image/resetAll' }
   | { type: 'gb/setPalette'; paletteKey: GbPaletteKey }
   | { type: 'gb/setInvert'; invert: boolean }
@@ -59,6 +60,7 @@ export const actions = {
   imageToggleMirrorV: (): AppAction => ({ type: 'image/toggleMirrorV' }),
   imageSetEditorZoom: (editorZoom: number): AppAction => ({ type: 'image/setEditorZoom', editorZoom }),
   imageSetEditorMaxZoom: (editorMaxZoom: number): AppAction => ({ type: 'image/setEditorMaxZoom', editorMaxZoom }),
+  imageSetSourceDims: (dims: ImageDims | null): AppAction => ({ type: 'image/setSourceDims', dims }),
   imageResetAll: (): AppAction => ({ type: 'image/resetAll' }),
   gbSetPalette: (paletteKey: GbPaletteKey): AppAction => ({ type: 'gb/setPalette', paletteKey }),
   gbSetInvert: (invert: boolean): AppAction => ({ type: 'gb/setInvert', invert }),

@@ -191,6 +191,10 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.store.dispatch(actions.outputSetBaseName(file.name.replace(/\.[^.]+$/, '')));
       deps.store.dispatch(actions.setLoadedType('image'));
       deps.runtime.loadedImg = await loadImageFromDataUrl(await readFileAsDataUrl(file));
+      deps.store.dispatch(actions.imageSetSourceDims({
+        width: deps.runtime.loadedImg.naturalWidth,
+        height: deps.runtime.loadedImg.naturalHeight,
+      }));
       await resetEditor();
     } catch (error) {
       unloadImage();

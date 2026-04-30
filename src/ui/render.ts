@@ -76,11 +76,17 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.paletteInfoVal.textContent = fileInfo?.paletteInfoText ?? '—';
   dom.paletteInfo.style.display = fileInfo?.paletteInfoText ? '' : 'none';
 
+  const dimsText = state.loadedType === 'gb'
+    ? state.gb.dims ? `${state.gb.dims.width}×${state.gb.dims.height}` : null
+    : state.loadedType === 'image' && state.image.sourceDims
+      ? `${state.image.sourceDims.width}×${state.image.sourceDims.height}`
+      : null;
+  const dimsSuffix = dimsText ? ` · ${dimsText}` : '';
   dom.sourceLabel.textContent = state.loadedType === 'gb'
-    ? 'GB — native palette'
+    ? `GB${dimsSuffix} — native palette`
     : state.image.mode === 'crop'
-      ? 'Source — drag or click to reposition'
-      : 'Source';
+      ? `Source${dimsSuffix} — drag or click to reposition`
+      : `Source${dimsSuffix}`;
   dom.cropBox.style.display = state.loadedType === 'image' && state.image.mode === 'crop' ? 'block' : 'none';
 
   dom.rotateValEl.textContent = `${state.loadedType === 'gb' ? state.gb.rotation : state.image.rotation}°`;
