@@ -53,6 +53,7 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | Editor scale math (`displayScale`, `workScale`, `maxZoom`, clamped zoom, dispImg dims) | `domain/geometry.ts:computeEditorGeometry` |
 | Crop region / fit offsets in source-pixel coordinates | `domain/geometry.ts:buildImageRenderPlan` (used by convert AND autoLevels) |
 | Image source rotation/mirroring | `features/image/source.ts:buildRotatedSource` + `getSourceImage` |
+| Source natural dimensions (display label) | `state.image.sourceDims` set by `features/image/controller.ts:loadImageFile` from `loadedImg.naturalWidth/Height`; GB side reuses `state.gb.dims` set by `features/gb/controller.ts:decodeGbDraw`. Rendered into `sourceLabel` by `ui/render.ts`. |
 | Source-canvas redraw (editor preview, **not** output) | `features/image/controller.ts:redrawSourceCanvas` — native `drawImage`, never pica |
 | Geometry commit (writing scales / box / canvas size / frame size to runtime+DOM) | `features/image/controller.ts:applyGeometry` — both `resetEditor` and `applyEditorZoom` route through it; differ only by `ScrollAnchor` |
 | Pica / Lanczos resampling | `infra/canvas/picaResize.ts:stepDownscaleAndResize`, called only from `features/image/service.ts:renderImageBaseRaster` and `features/image/controller.ts:autoLevels`. **Never in the editor preview.** |
@@ -196,6 +197,7 @@ File picker
   → ui/fileInput.ts → loaderRouter.loadFile
   → imageController.loadImageFile
       readFileAsDataUrl → loadImageFromDataUrl → runtime.loadedImg
+      dispatch imageSetSourceDims({width, height})  ← natural pixel dims for the source label
   → resetEditor
       buildRotatedSource (if any rotation/mirror) → runtime.rotatedSrc
       computeEditorGeometry  (pure)
