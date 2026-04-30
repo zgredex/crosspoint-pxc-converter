@@ -160,30 +160,30 @@ export function createAppController(deps: AppControllerDeps): AppController {
     deps.imageController.applyEditorZoom(next);
   }
 
-  function downloadPxc(): void {
+  function downloadActive(
+    encoder: (px: Uint8Array, w: number, h: number) => Uint8Array,
+    outputField: 'pxcBytes' | 'bmpBytes',
+    ext: 'pxc' | 'bmp',
+    mime: string,
+  ): void {
     const state = deps.store.getState();
+    const filename = `${state.output.baseName}.${ext}`;
     if (state.loadedType === 'image') {
       const px = deps.imageRuntime.lastIndexedPixels;
       if (!px) return;
-      triggerDownload(encodePxc(px, state.device.targetW, state.device.targetH), `${state.output.baseName}.pxc`, 'application/octet-stream');
+      triggerDownload(encoder(px, state.device.targetW, state.device.targetH), filename, mime);
       return;
     }
-    if (deps.output.pxcBytes) {
-      triggerDownload(deps.output.pxcBytes, `${state.output.baseName}.pxc`, 'application/octet-stream');
-    }
+    const bytes = deps.output[outputField];
+    if (bytes) triggerDownload(bytes, filename, mime);
+  }
+
+  function downloadPxc(): void {
+    downloadActive(encodePxc, 'pxcBytes', 'pxc', 'application/octet-stream');
   }
 
   function downloadBmp(): void {
-    const state = deps.store.getState();
-    if (state.loadedType === 'image') {
-      const px = deps.imageRuntime.lastIndexedPixels;
-      if (!px) return;
-      triggerDownload(encodeGrayBmp(px, state.device.targetW, state.device.targetH), `${state.output.baseName}.bmp`, 'image/bmp');
-      return;
-    }
-    if (deps.output.bmpBytes) {
-      triggerDownload(deps.output.bmpBytes, `${state.output.baseName}.bmp`, 'image/bmp');
-    }
+    downloadActive(encodeGrayBmp, 'bmpBytes', 'bmp', 'image/bmp');
   }
 
   return {

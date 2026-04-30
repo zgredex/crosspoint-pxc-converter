@@ -1,14 +1,12 @@
 import { actions } from '../../app/actions';
 import type { AppStore } from '../../app/store';
-import type { AppDom } from '../../ui/dom';
 import type { GbRuntime } from '../../app/runtime/gbRuntime';
-import { clearOutputBytes, setOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
+import { setOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
 import { decode2bpp } from '../../domain/gb/decode2bpp';
 import { parsePrinterTxt } from '../../domain/gb/parsePrinterTxt';
 import { rotatePixels } from '../../domain/gb/rotatePixels';
 import { readFileAsArrayBuffer, readFileAsText } from '../../infra/browser/imageLoader';
-import { getContext2d } from '../../infra/canvas/context';
 import { renderGbSourceCanvas } from '../../infra/canvas/gbSourceRenderer';
 import { renderIndexedPreview } from '../../infra/canvas/previewRenderer';
 import { buildGbFileInfo, buildGbOutputArtifacts, buildGbSourceView } from './service';
@@ -28,15 +26,21 @@ export type GbController = {
   scaleDown(): void;
 };
 
+export type GbControllerElements = {
+  previewCanvas: HTMLCanvasElement;
+  gbCanvas: HTMLCanvasElement;
+};
+
 type GbControllerDeps = {
   store: AppStore;
-  dom: AppDom;
+  elements: GbControllerElements;
   runtime: GbRuntime;
   output: OutputRuntime;
   clearStatus: () => void;
   showError: (message: string) => void;
   clearHistogramView: () => void;
   validateGbBytes: (bytes: Uint8Array, sourceLabel: string) => void;
+  resetSession: () => void;
 };
 
 const TILES_WIDE = 20;
@@ -54,19 +58,13 @@ export function createGbController(deps: GbControllerDeps): GbController {
   }
 
   function unloadGb(): void {
-    deps.clearStatus();
-    deps.dom.gbCanvas.width = 1;
-    deps.dom.gbCanvas.height = 1;
+    deps.elements.gbCanvas.width = 1;
+    deps.elements.gbCanvas.height = 1;
     deps.runtime.rawBytes = null;
     deps.runtime.pixels = null;
     deps.runtime.paletteRemap = null;
     deps.store.dispatch(actions.gbResetAll());
-    deps.store.dispatch(actions.setLoadedType(null));
-    getContext2d(deps.dom.previewCanvas).clearRect(0, 0, getState().device.targetW, getState().device.targetH);
-    deps.dom.fileInput.value = '';
-    clearOutputBytes(deps.output);
-    deps.store.dispatch(actions.outputClear());
-    deps.store.dispatch(actions.outputSetBaseName('sleep'));
+    deps.resetSession();
   }
 
   function drawGbSource(): void {
@@ -74,7 +72,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
     const state = getState();
     const view = buildGbSourceView(pixels, width, height, state.gb.rotation, state.gb.zoom);
     renderGbSourceCanvas(
-      deps.dom.gbCanvas,
+      deps.elements.gbCanvas,
       view.pixels,
       view.width,
       view.height,
@@ -102,7 +100,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
       paletteKey: state.gb.paletteKey,
     });
 
-    renderIndexedPreview(deps.dom.previewCanvas, outputs.indexedPixels, state.device.targetW, state.device.targetH);
+    renderIndexedPreview(deps.elements.previewCanvas, outputs.indexedPixels, state.device.targetW, state.device.targetH);
     setOutputBytes(deps.output, outputs.pxcBytes, outputs.bmpBytes);
     deps.clearHistogramView();
     deps.store.dispatch(actions.outputSetReady(true, true));
@@ -184,26 +182,23 @@ export function createGbController(deps: GbControllerDeps): GbController {
     if (deps.runtime.pixels) drawGbSource();
   }
 
-  function scaleUp(): void {
+  function adjustOutputScale(delta: 1 | -1): void {
     if (!deps.runtime.pixels) return;
-    const { pixels, width, height } = requireDecoded();
     const state = getState();
-    const rotated = rotatePixels(pixels, width, height, state.gb.rotation);
-    const maxScale = Math.min(Math.floor(state.device.targetW / rotated.w), Math.floor(state.device.targetH / rotated.h));
-    if (state.gb.outputScale < maxScale) {
-      deps.store.dispatch(actions.gbSetOutputScale(state.gb.outputScale + 1));
-      buildOutput();
+    const next = state.gb.outputScale + delta;
+    if (next < 1) return;
+    if (delta === 1) {
+      const { pixels, width, height } = requireDecoded();
+      const rotated = rotatePixels(pixels, width, height, state.gb.rotation);
+      const maxScale = Math.min(Math.floor(state.device.targetW / rotated.w), Math.floor(state.device.targetH / rotated.h));
+      if (next > maxScale) return;
     }
+    deps.store.dispatch(actions.gbSetOutputScale(next));
+    buildOutput();
   }
 
-  function scaleDown(): void {
-    if (!deps.runtime.pixels) return;
-    const state = getState();
-    if (state.gb.outputScale > 1) {
-      deps.store.dispatch(actions.gbSetOutputScale(state.gb.outputScale - 1));
-      buildOutput();
-    }
-  }
+  function scaleUp(): void { adjustOutputScale(1); }
+  function scaleDown(): void { adjustOutputScale(-1); }
 
   return {
     loadBinaryFile,

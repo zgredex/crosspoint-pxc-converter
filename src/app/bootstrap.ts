@@ -4,6 +4,7 @@ import { clearStatus, showError } from './messages';
 import { createGbRuntime } from './runtime/gbRuntime';
 import { createImageRuntime } from './runtime/imageRuntime';
 import { createOutputRuntime } from './runtime/outputRuntime';
+import { resetSession } from './sessionReset';
 import { store } from './store';
 import { validateGbBytes } from './validation';
 import { clearHistogram, mountHistogramAutoResize } from '../infra/canvas/histogramRenderer';
@@ -11,7 +12,7 @@ import { createPicaResizer } from '../infra/canvas/picaResize';
 import { createImageWorkerClient } from '../infra/worker/imageWorkerClient';
 import { createGbController } from '../features/gb/controller';
 import { createImageController } from '../features/image/controller';
-import { setupImageCropInteraction } from '../features/image/cropWiring';
+import { setupImageCropInteraction } from '../ui/imageCropBridge';
 import type { GbController } from '../features/gb/controller';
 import type { ImageController } from '../features/image/controller';
 import { bindStoreControls } from '../ui/bindings';
@@ -50,6 +51,16 @@ function clearHistogramView(): void {
   clearHistogram(histogramCanvas, imageRuntime);
 }
 
+function resetSessionShared(): void {
+  resetSession({
+    store,
+    output: outputRuntime,
+    previewCanvas: dom.previewCanvas,
+    fileInput: dom.fileInput,
+    clearStatus: () => clearStatus(store),
+  });
+}
+
 const picaInstance = createPicaResizer();
 const workerClient = createImageWorkerClient();
 
@@ -70,7 +81,14 @@ mountHistogramAutoResize({
 
 imageController = createImageController({
   store,
-  dom,
+  elements: {
+    previewCanvas: dom.previewCanvas,
+    histogramCanvas: dom.histogramCanvas,
+    sourceCanvas: dom.sourceCanvas,
+    workCanvas: dom.workCanvas,
+    sourceFrame: dom.sourceFrame,
+    cropBox: dom.cropBox,
+  },
   runtime: imageRuntime,
   output: outputRuntime,
   pica: picaInstance,
@@ -79,17 +97,22 @@ imageController = createImageController({
   showError: message => showError(store, message),
   clearHistogramView,
   clearSnap,
+  resetSession: resetSessionShared,
 });
 
 gbController = createGbController({
   store,
-  dom,
+  elements: {
+    previewCanvas: dom.previewCanvas,
+    gbCanvas: dom.gbCanvas,
+  },
   runtime: gbRuntime,
   output: outputRuntime,
   clearStatus: () => clearStatus(store),
   showError: message => showError(store, message),
   clearHistogramView,
   validateGbBytes,
+  resetSession: resetSessionShared,
 });
 
 appController = createAppController({

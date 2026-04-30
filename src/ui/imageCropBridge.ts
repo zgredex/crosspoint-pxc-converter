@@ -1,8 +1,8 @@
-import type { AppStore } from '../../app/store';
-import type { AppDom } from '../../ui/dom';
-import { setupCropInteraction } from '../../ui/cropInteraction';
-import type { ImageRuntime } from '../../app/runtime/imageRuntime';
-import { applyCropBoxToDom, nudgeCropBoxIntoView as nudgeCropBox } from './cropBox';
+import type { AppStore } from '../app/store';
+import type { AppDom } from './dom';
+import { setupCropInteraction } from './cropInteraction';
+import type { ImageRuntime } from '../app/runtime/imageRuntime';
+import { applyCropBoxToDom, nudgeCropBoxIntoView as nudgeCropBox } from '../features/image/cropBox';
 
 const SNAP_THRESHOLD = 9;
 const WHEEL_ZOOM_K = 0.0015;

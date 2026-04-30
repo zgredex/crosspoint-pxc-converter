@@ -34,14 +34,11 @@ function createMockStore(state = initialAppState): AppStore & { actions: unknown
 describe('image controller', () => {
   it('updates rotation state', () => {
     const store = createMockStore();
-    const dom = {
-      rotateValEl: { textContent: '' },
-      zoomLabelEl: { textContent: '' },
-    } as unknown as Parameters<typeof createImageController>[0]['dom'];
+    const elements = {} as unknown as Parameters<typeof createImageController>[0]['elements'];
 
     const controller = createImageController({
       store,
-      dom,
+      elements,
       runtime: createImageRuntime(),
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
@@ -50,6 +47,7 @@ describe('image controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
+      resetSession: vi.fn(),
     });
 
     controller.setRotation(90);
@@ -59,14 +57,11 @@ describe('image controller', () => {
 
   it('updates zoom state', () => {
     const store = createMockStore();
-    const dom = {
-      rotateValEl: { textContent: '' },
-      zoomLabelEl: { textContent: '' },
-    } as unknown as Parameters<typeof createImageController>[0]['dom'];
+    const elements = {} as unknown as Parameters<typeof createImageController>[0]['elements'];
 
     const controller = createImageController({
       store,
-      dom,
+      elements,
       runtime: createImageRuntime(),
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
@@ -75,6 +70,7 @@ describe('image controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
+      resetSession: vi.fn(),
     });
 
     controller.setZoom(2);
@@ -93,10 +89,7 @@ describe('image controller', () => {
     const runtime = createImageRuntime();
     const controller = createImageController({
       store: createMockStore(),
-      dom: {
-        rotateValEl: { textContent: '' },
-        zoomLabelEl: { textContent: '' },
-      } as never,
+      elements: {} as never,
       runtime,
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
@@ -105,6 +98,7 @@ describe('image controller', () => {
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       clearSnap: vi.fn(),
+      resetSession: vi.fn(),
     });
 
     controller.requestConvert();

@@ -25,21 +25,18 @@ function createMockStore(state = initialAppState): AppStore & { actions: unknown
 describe('gb controller', () => {
   it('updates GB rotation state', () => {
     const store = createMockStore();
-    const dom = {
-      rotateValEl: { textContent: '' },
-      gbScaleVal: { textContent: '' },
-      zoomLabelEl: { textContent: '' },
-    } as unknown as Parameters<typeof createGbController>[0]['dom'];
+    const elements = {} as unknown as Parameters<typeof createGbController>[0]['elements'];
 
     const controller = createGbController({
       store,
-      dom,
+      elements,
       runtime: createGbRuntime(),
       output: createOutputRuntime(),
       clearStatus: vi.fn(),
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       validateGbBytes: vi.fn(),
+      resetSession: vi.fn(),
     });
 
     controller.setRotation(180);
@@ -51,17 +48,14 @@ describe('gb controller', () => {
     const store = createMockStore();
     const controller = createGbController({
       store,
-      dom: {
-        rotateValEl: { textContent: '' },
-        gbScaleVal: { textContent: '' },
-        zoomLabelEl: { textContent: '' },
-      } as never,
+      elements: {} as never,
       runtime: createGbRuntime(),
       output: createOutputRuntime(),
       clearStatus: vi.fn(),
       showError: vi.fn(),
       clearHistogramView: vi.fn(),
       validateGbBytes: vi.fn(),
+      resetSession: vi.fn(),
     });
 
     controller.setZoom(3);

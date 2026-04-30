@@ -2,8 +2,7 @@ import type { FitBackground } from '../../app/state';
 import type { ImageRenderPlan } from '../../domain/geometry';
 import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import { stepDownscaleAndResize, type PicaResizer } from '../../infra/canvas/picaResize';
-
-type SourceImage = HTMLImageElement | HTMLCanvasElement;
+import type { SourceImage } from './source';
 
 export async function renderImageBaseRaster(params: {
   src: SourceImage;

@@ -1,8 +1,7 @@
-import { actions } from '../../app/actions';
+import { actions, type AppAction } from '../../app/actions';
 import type { AppStore } from '../../app/store';
-import type { AppDom } from '../../ui/dom';
 import type { ImageRuntime } from '../../app/runtime/imageRuntime';
-import { clearOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
+import type { OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
 import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import type { PicaResizer } from '../../infra/canvas/picaResize';
@@ -11,6 +10,7 @@ import {
   computeEditorGeometry,
   getImageAnalysisRegion,
   type EditorGeometry,
+  type ImageRenderPlan,
 } from '../../domain/geometry';
 import { buildUintHistogram } from '../../domain/histogram';
 import { buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
@@ -38,9 +38,18 @@ export type ImageController = {
   toggleMirrorV(): void;
 };
 
+export type ImageControllerElements = {
+  previewCanvas: HTMLCanvasElement;
+  histogramCanvas: HTMLCanvasElement;
+  sourceCanvas: HTMLCanvasElement;
+  workCanvas: HTMLCanvasElement;
+  sourceFrame: HTMLDivElement;
+  cropBox: HTMLDivElement;
+};
+
 type ImageControllerDeps = {
   store: AppStore;
-  dom: AppDom;
+  elements: ImageControllerElements;
   runtime: ImageRuntime;
   output: OutputRuntime;
   pica: PicaResizer;
@@ -49,6 +58,7 @@ type ImageControllerDeps = {
   showError: (message: string) => void;
   clearHistogramView: () => void;
   clearSnap: () => void;
+  resetSession: () => void;
 };
 
 const MAX_EDITOR_WIDTH = 340;
@@ -63,6 +73,32 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   let processRequested = false;
   let rasterDirty = true;
 
+  function getActiveSource(): SourceImage {
+    const state = getState();
+    return getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
+  }
+
+  function currentRenderPlan(sourceW: number, sourceH: number): ImageRenderPlan {
+    const state = getState();
+    return buildImageRenderPlan({
+      mode: state.image.mode,
+      sourceW,
+      sourceH,
+      targetW: state.device.targetW,
+      targetH: state.device.targetH,
+      fitAlign: state.image.fitAlign,
+      displayScale: deps.runtime.displayScale,
+      workScale: deps.runtime.workScale,
+      boxX: deps.runtime.boxX,
+      boxY: deps.runtime.boxY,
+    });
+  }
+
+  function dispatchAndRetransform(action: AppAction): void {
+    deps.store.dispatch(action);
+    if (deps.runtime.loadedImg) void refreshTransformedSource();
+  }
+
   deps.worker.onResult((result) => {
     if (result.version !== deps.runtime.processVersion) return;
 
@@ -70,8 +106,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.runtime.lastIndexedPixels = new Uint8Array(result.indexedPixels);
     deps.runtime.lastHistogram = new Float32Array(result.histogram);
 
-    renderIndexedPreview(deps.dom.previewCanvas, deps.runtime.lastIndexedPixels, state.device.targetW, state.device.targetH);
-    renderHistogram(deps.dom.histogramCanvas, deps.runtime.lastHistogram, state.device.totalPixels);
+    renderIndexedPreview(deps.elements.previewCanvas, deps.runtime.lastIndexedPixels, state.device.targetW, state.device.targetH);
+    renderHistogram(deps.elements.histogramCanvas, deps.runtime.lastHistogram, state.device.totalPixels);
     deps.store.dispatch(actions.outputSetReady(true, true));
 
     processing = false;
@@ -93,8 +129,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   }
 
   function setRotation(rotation: Rotation): void {
-    deps.store.dispatch(actions.imageSetRotation(rotation));
-    if (deps.runtime.loadedImg) void refreshTransformedSource();
+    dispatchAndRetransform(actions.imageSetRotation(rotation));
   }
 
   function setZoom(zoom: number): void {
@@ -106,22 +141,17 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (deps.runtime.loadedImg && deps.runtime.dispImgW > 0) {
       deps.runtime.boxX = deps.runtime.dispImgW - deps.runtime.boxX - deps.runtime.boxW;
     }
-    deps.store.dispatch(actions.imageToggleMirrorH());
-    if (deps.runtime.loadedImg) void refreshTransformedSource();
+    dispatchAndRetransform(actions.imageToggleMirrorH());
   }
 
   function toggleMirrorV(): void {
     if (deps.runtime.loadedImg && deps.runtime.dispImgH > 0) {
       deps.runtime.boxY = deps.runtime.dispImgH - deps.runtime.boxY - deps.runtime.boxH;
     }
-    deps.store.dispatch(actions.imageToggleMirrorV());
-    if (deps.runtime.loadedImg) void refreshTransformedSource();
+    dispatchAndRetransform(actions.imageToggleMirrorV());
   }
 
   function unloadImage(): void {
-    deps.clearStatus();
-    deps.store.dispatch(actions.setLoadedType(null));
-
     if (deps.runtime.convertTimer !== null) {
       cancelAnimationFrame(deps.runtime.convertTimer);
       deps.runtime.convertTimer = null;
@@ -132,20 +162,16 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.runtime.loadedImg = null;
     }
 
-    clearOutputBytes(deps.output);
-    deps.store.dispatch(actions.outputClear());
-    deps.store.dispatch(actions.outputSetBaseName('sleep'));
     deps.runtime.cachedBaseRaster = null;
     deps.runtime.lastIndexedPixels = null;
     deps.runtime.sharedBufferVersion = 0;
     rasterDirty = true;
 
-    deps.dom.sourceCanvas.width = 1;
-    deps.dom.sourceCanvas.height = 1;
-    getContext2d(deps.dom.workCanvas).clearRect(0, 0, getState().device.targetW, getState().device.targetH);
-    getContext2d(deps.dom.previewCanvas).clearRect(0, 0, getState().device.targetW, getState().device.targetH);
+    deps.elements.sourceCanvas.width = 1;
+    deps.elements.sourceCanvas.height = 1;
+    getContext2d(deps.elements.workCanvas).clearRect(0, 0, getState().device.targetW, getState().device.targetH);
 
-    deps.dom.fileInput.value = '';
+    deps.resetSession();
     deps.store.dispatch(actions.imageResetAll());
 
     if (deps.runtime.rotatedSrc) {
@@ -155,7 +181,6 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     }
 
     deps.clearSnap();
-
     deps.clearHistogramView();
   }
 
@@ -176,9 +201,9 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   type ScrollAnchor = { kind: 'box' } | { kind: 'point'; clientX: number; clientY: number };
 
   function redrawSourceCanvas(src: SourceImage, w: number, h: number): void {
-    deps.dom.sourceCanvas.width = w;
-    deps.dom.sourceCanvas.height = h;
-    const ctx = getContext2d(deps.dom.sourceCanvas);
+    deps.elements.sourceCanvas.width = w;
+    deps.elements.sourceCanvas.height = h;
+    const ctx = getContext2d(deps.elements.sourceCanvas);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(src, 0, 0, w, h);
@@ -207,7 +232,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   function applyGeometry(src: SourceImage, sourceW: number, sourceH: number, geom: EditorGeometry, anchor: ScrollAnchor): void {
     const state = getState();
     const oldDisplay = deps.runtime.displayScale || geom.displayScale;
-    const frame = deps.dom.sourceFrame;
+    const frame = deps.elements.sourceFrame;
 
     let anchorFx = 0;
     let anchorFy = 0;
@@ -244,7 +269,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (state.image.mode === 'crop') {
       applyCropBoxToDom({
         runtime: deps.runtime,
-        cropBox: deps.dom.cropBox,
+        cropBox: deps.elements.cropBox,
         sourceFrame: frame,
         scrollIntoView: anchor.kind === 'box',
       });
@@ -265,9 +290,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
   function getMaxEditorZoom(): number {
     if (!deps.runtime.loadedImg) return 1;
-    const state = getState();
-    const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
-    return geometryFor(state.image.editorZoom, src).geom.maxZoom;
+    const src = getActiveSource();
+    return geometryFor(getState().image.editorZoom, src).geom.maxZoom;
   }
 
   async function resetEditor(): Promise<void> {
@@ -276,7 +300,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       buildRotatedSource(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
     }
 
-    const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
+    const src = getActiveSource();
     const { sourceW, sourceH, geom } = geometryFor(state.image.editorZoom, src);
     if (geom.clampedZoom !== state.image.editorZoom) {
       deps.store.dispatch(actions.imageSetEditorZoom(geom.clampedZoom));
@@ -290,7 +314,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   function applyEditorZoom(targetZoom: number, anchorClientX?: number, anchorClientY?: number): void {
     if (!deps.runtime.loadedImg) return;
     const state = getState();
-    const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
+    const src = getActiveSource();
     const { sourceW, sourceH, geom } = geometryFor(targetZoom, src);
     if (geom.clampedZoom === state.image.editorZoom && deps.runtime.dispImgW === geom.dispImgW) return;
 
@@ -310,22 +334,9 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
     const state = getState();
     const gen = ++deps.runtime.autoLevelsGen;
-    const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
-    const sourceWidth = srcW(src);
-    const sourceHeight = srcH(src);
+    const src = getActiveSource();
     const tempCanvas = createCanvas(state.device.targetW, state.device.targetH);
-    const plan = buildImageRenderPlan({
-      mode: state.image.mode,
-      sourceW: sourceWidth,
-      sourceH: sourceHeight,
-      targetW: state.device.targetW,
-      targetH: state.device.targetH,
-      fitAlign: state.image.fitAlign,
-      displayScale: deps.runtime.displayScale,
-      workScale: deps.runtime.workScale,
-      boxX: deps.runtime.boxX,
-      boxY: deps.runtime.boxY,
-    });
+    const plan = currentRenderPlan(srcW(src), srcH(src));
 
     await renderImageBaseRaster({
       src,
@@ -355,31 +366,18 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     const state = getState();
 
     if (rasterDirty || !deps.runtime.cachedBaseRaster) {
-      const src = getSourceImage(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
-      const sourceWidth = srcW(src);
-      const sourceHeight = srcH(src);
-      const plan = buildImageRenderPlan({
-        mode: state.image.mode,
-        sourceW: sourceWidth,
-        sourceH: sourceHeight,
-        targetW: state.device.targetW,
-        targetH: state.device.targetH,
-        fitAlign: state.image.fitAlign,
-        displayScale: deps.runtime.displayScale,
-        workScale: deps.runtime.workScale,
-        boxX: deps.runtime.boxX,
-        boxY: deps.runtime.boxY,
-      });
+      const src = getActiveSource();
+      const plan = currentRenderPlan(srcW(src), srcH(src));
 
       await renderImageBaseRaster({
         src,
-        targetCanvas: deps.dom.workCanvas,
+        targetCanvas: deps.elements.workCanvas,
         plan,
         fitBg: state.background,
         pica: deps.pica,
       });
 
-      deps.runtime.cachedBaseRaster = getContext2d(deps.dom.workCanvas).getImageData(
+      deps.runtime.cachedBaseRaster = getContext2d(deps.elements.workCanvas).getImageData(
         0, 0, state.device.targetW, state.device.targetH,
       ).data;
 
