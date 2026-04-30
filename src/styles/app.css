@@ -147,12 +147,13 @@ h1 {
 .editor-section.visible { display: flex; flex-direction: column; align-items: center; }
 
 .source-header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: fit-content;
-  gap: 14px;
-  margin-bottom: 8px;
+  width: min(100%, 340px);
+  gap: 18px;
+  margin-bottom: 4px;
 }
 
 .section-label {
@@ -162,9 +163,16 @@ h1 {
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 92px);
+  text-align: center;
 }
 
 .change-btn {
+  position: absolute;
+  right: 0;
   font-family: 'DM Sans', sans-serif;
   font-size: 0.65rem;
   color: var(--muted);
@@ -178,13 +186,21 @@ h1 {
 }
 .change-btn:hover { color: var(--text); border-color: var(--muted); }
 
+.source-sub-label {
+  width: min(100%, 340px);
+  margin: 0 0 10px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+}
+.source-sub-label[hidden] { display: none; }
+
 .zoom-controls {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 10px;
+  justify-content: space-between;
+  width: min(100%, 208px);
+  gap: 6px;
 }
 
 .zoom-controls-label {
@@ -195,10 +211,13 @@ h1 {
   letter-spacing: 0.9px;
   line-height: 1;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .zoom-slider {
-  width: 140px;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 132px;
   height: 18px;
   margin: 0;
   padding: 0;
@@ -262,6 +281,7 @@ h1 {
   border-radius: 8px;
   display: inline-block;
   scrollbar-width: none;
+  margin-top: 12px;
 }
 .source-frame::-webkit-scrollbar { display: none; }
 
@@ -303,12 +323,17 @@ h1 {
 #snapGuideV { width: 1px; top: 0; left: 0; }
 
 .zoom-hint {
+  width: min(100%, 340px);
   margin: 6px 0 0;
   font-size: 0.72rem;
   color: var(--muted);
   text-align: center;
 }
 .zoom-hint[hidden] { display: none; }
+
+.source-wrap {
+  margin-top: 12px;
+}
 
 .help-tip {
   display: inline-flex;

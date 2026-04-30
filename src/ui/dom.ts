@@ -19,6 +19,7 @@ export function createDom() {
     sourceFrame: requiredElement<HTMLDivElement>('sourceFrame'),
     sourceCanvas: requiredElement<HTMLCanvasElement>('sourceCanvas'),
     sourceLabel: requiredElement<HTMLParagraphElement>('sourceLabel'),
+    sourceSubLabel: requiredElement<HTMLParagraphElement>('sourceSubLabel'),
     changeBtn: requiredElement<HTMLButtonElement>('changeBtn'),
     cropBox: requiredElement<HTMLDivElement>('cropBox'),
     snapGuideH: requiredElement<HTMLDivElement>('snapGuideH'),

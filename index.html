@@ -32,9 +32,15 @@
 
     <div class="editor-section" id="editorSection">
       <div class="source-header">
-        <p class="section-label" id="sourceLabel">Source — drag to reposition</p>
+        <p class="section-label" id="sourceLabel">Source</p>
         <button class="change-btn" id="changeBtn">Clear</button>
       </div>
+      <p class="source-sub-label" id="sourceSubLabel"></p>
+      <div class="zoom-controls" id="zoomControls">
+        <label for="zoomSlider" class="zoom-controls-label">Zoom</label>
+        <input id="zoomSlider" class="zoom-slider" type="range" min="1" max="1" step="0.01" value="1" aria-label="Editor zoom">
+      </div>
+      <p class="zoom-hint" id="zoomHint" hidden></p>
       <div class="source-frame" id="sourceFrame">
         <canvas id="sourceCanvas"></canvas>
         <div id="cropBox"></div>
@@ -44,11 +50,6 @@
       <div class="source-wrap" id="gbSourceWrap">
         <canvas id="gbCanvas"></canvas>
       </div>
-      <div class="zoom-controls" id="zoomControls">
-        <label for="zoomSlider" class="zoom-controls-label">Zoom</label>
-        <input id="zoomSlider" class="zoom-slider" type="range" min="1" max="1" step="0.01" value="1" aria-label="Editor zoom">
-      </div>
-      <p class="zoom-hint" id="zoomHint" hidden></p>
     </div>
 
     <div class="file-info" id="gbFileInfo">

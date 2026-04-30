@@ -83,10 +83,14 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
       : null;
   const dimsSuffix = dimsText ? ` · ${dimsText}` : '';
   dom.sourceLabel.textContent = state.loadedType === 'gb'
-    ? `GB${dimsSuffix} — native palette`
+    ? `GB${dimsSuffix}`
+    : `Source${dimsSuffix}`;
+  dom.sourceSubLabel.textContent = state.loadedType === 'gb'
+    ? 'native palette'
     : state.image.mode === 'crop'
-      ? `Source${dimsSuffix} — drag or click to reposition`
-      : `Source${dimsSuffix}`;
+      ? 'drag or click to reposition'
+      : '';
+  dom.sourceSubLabel.hidden = dom.sourceSubLabel.textContent === '';
   dom.cropBox.style.display = state.loadedType === 'image' && state.image.mode === 'crop' ? 'block' : 'none';
 
   dom.rotateValEl.textContent = `${state.loadedType === 'gb' ? state.gb.rotation : state.image.rotation}°`;
