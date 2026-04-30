@@ -100,7 +100,7 @@ Controls run in this processing order: black/white-point map → gamma → contr
 | Control | Description |
 |---------|-------------|
 | **Black / White points** | 0–255 sliders that linearly remap the input range. Each clamps against the other so they cannot cross. |
-| **Gamma** | 0.30–3.00, default 1.00. Applies `Vout = Vin^(1/γ)` after the black/white remap. γ > 1 lifts shadows (brighter, more shadow detail); γ < 1 compresses shadows (darker, more highlight detail). |
+| **Gamma** | 0.30–5.00, default 1.00. Applies `Vout = Vin^(1/γ)` after the black/white remap. γ > 1 lifts shadows (brighter, more shadow detail); γ < 1 compresses shadows (darker, more highlight detail). |
 | **Contrast** | ±100 linear adjustment, pivoting at midpoint (128). |
 | **Invert** | Inverts luminance after tone mapping, before dithering. |
 | **Auto** | Sets black and white points from histogram percentile clipping; resets gamma to 1.00. |
