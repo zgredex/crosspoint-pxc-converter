@@ -1,5 +1,4 @@
-import type { DitherMode } from '../../domain/dither';
-import type { WorkerSettings, WorkerOutMessage } from './imageWorker';
+import type { WorkerOutMessage, WorkerSettings } from './workerProtocol';
 
 export type ImageWorkerClient = {
   setBaseRaster(buffer: SharedArrayBuffer, width: number, height: number, version: number): void;

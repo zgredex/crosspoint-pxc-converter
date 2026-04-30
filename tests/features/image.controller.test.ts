@@ -43,11 +43,13 @@ describe('image controller', () => {
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
       worker: createMockWorker(),
-      clearStatus: vi.fn(),
-      showError: vi.fn(),
-      clearHistogramView: vi.fn(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
       clearSnap: vi.fn(),
-      resetSession: vi.fn(),
     });
 
     controller.setRotation(90);
@@ -66,11 +68,13 @@ describe('image controller', () => {
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
       worker: createMockWorker(),
-      clearStatus: vi.fn(),
-      showError: vi.fn(),
-      clearHistogramView: vi.fn(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
       clearSnap: vi.fn(),
-      resetSession: vi.fn(),
     });
 
     controller.setZoom(2);
@@ -94,11 +98,13 @@ describe('image controller', () => {
       output: createOutputRuntime(),
       pica: { resize: vi.fn() },
       worker: createMockWorker(),
-      clearStatus: vi.fn(),
-      showError: vi.fn(),
-      clearHistogramView: vi.fn(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
       clearSnap: vi.fn(),
-      resetSession: vi.fn(),
     });
 
     controller.requestConvert();

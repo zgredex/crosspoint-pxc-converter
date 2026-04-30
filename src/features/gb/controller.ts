@@ -1,5 +1,6 @@
 import { actions } from '../../app/actions';
 import type { AppStore } from '../../app/store';
+import type { ControllerHost } from '../../app/controllerHost';
 import type { GbRuntime } from '../../app/runtime/gbRuntime';
 import { setOutputBytes, type OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
@@ -36,11 +37,8 @@ type GbControllerDeps = {
   elements: GbControllerElements;
   runtime: GbRuntime;
   output: OutputRuntime;
-  clearStatus: () => void;
-  showError: (message: string) => void;
-  clearHistogramView: () => void;
+  host: ControllerHost;
   validateGbBytes: (bytes: Uint8Array, sourceLabel: string) => void;
-  resetSession: () => void;
 };
 
 const TILES_WIDE = 20;
@@ -64,7 +62,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
     deps.runtime.pixels = null;
     deps.runtime.paletteRemap = null;
     deps.store.dispatch(actions.gbResetAll());
-    deps.resetSession();
+    deps.host.resetSession();
   }
 
   function drawGbSource(): void {
@@ -102,7 +100,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
 
     renderIndexedPreview(deps.elements.previewCanvas, outputs.indexedPixels, state.device.targetW, state.device.targetH);
     setOutputBytes(deps.output, outputs.pxcBytes, outputs.bmpBytes);
-    deps.clearHistogramView();
+    deps.host.clearHistogramView();
     deps.store.dispatch(actions.outputSetReady(true, true));
   }
 
@@ -131,7 +129,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
   }
 
   async function loadBinaryFile(file: File): Promise<void> {
-    deps.clearStatus();
+    deps.host.clearStatus();
     unloadGb();
     try {
       const baseName = file.name.replace(/\.[^.]+$/, '');
@@ -144,12 +142,12 @@ export function createGbController(deps: GbControllerDeps): GbController {
       initGb();
     } catch (error) {
       unloadGb();
-      deps.showError(error instanceof Error ? error.message : 'Failed to load the selected GB input.');
+      deps.host.showError(error instanceof Error ? error.message : 'Failed to load the selected GB input.');
     }
   }
 
   async function loadPrinterText(text: string, outputBaseName = 'pasted-printer-log'): Promise<void> {
-    deps.clearStatus();
+    deps.host.clearStatus();
     unloadGb();
     try {
       deps.store.dispatch(actions.outputSetBaseName(outputBaseName));
@@ -162,7 +160,7 @@ export function createGbController(deps: GbControllerDeps): GbController {
       initGb();
     } catch (error) {
       unloadGb();
-      deps.showError(error instanceof Error ? error.message : 'Failed to parse GB Printer text.');
+      deps.host.showError(error instanceof Error ? error.message : 'Failed to parse GB Printer text.');
     }
   }
 

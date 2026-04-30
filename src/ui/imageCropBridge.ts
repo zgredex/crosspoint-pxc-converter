@@ -1,7 +1,7 @@
 import type { AppStore } from '../app/store';
 import type { AppDom } from './dom';
 import { setupCropInteraction } from './cropInteraction';
-import type { ImageRuntime } from '../app/runtime/imageRuntime';
+import { setBoxPosition, type ImageRuntime } from '../app/runtime/imageRuntime';
 import { applyCropBoxToDom, nudgeCropBoxIntoView as nudgeCropBox } from '../features/image/cropBox';
 
 const SNAP_THRESHOLD = 9;
@@ -37,10 +37,7 @@ export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: ()
       boxX: deps.runtime.boxX,
       boxY: deps.runtime.boxY,
     }),
-    setBoxPosition: (x, y) => {
-      deps.runtime.boxX = x;
-      deps.runtime.boxY = y;
-    },
+    setBoxPosition: (x, y) => setBoxPosition(deps.runtime, x, y),
     applyCropBox: scrollIntoView => applyCropBoxToDom({
       runtime: deps.runtime,
       cropBox: deps.dom.cropBox,

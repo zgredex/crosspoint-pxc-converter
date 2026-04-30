@@ -1,4 +1,4 @@
-import type { ImageRuntime } from '../../app/runtime/imageRuntime';
+import { setBoxPosition, type ImageRuntime } from '../../app/runtime/imageRuntime';
 
 type CropBoxGeometry = Pick<ImageRuntime, 'boxX' | 'boxY' | 'boxW' | 'boxH'>;
 
@@ -58,8 +58,11 @@ export function applyCropBoxToDom(params: {
   const { runtime, cropBox, sourceFrame } = params;
   const margin = params.margin ?? 20;
 
-  runtime.boxX = Math.max(0, Math.min(runtime.dispImgW - runtime.boxW, runtime.boxX));
-  runtime.boxY = Math.max(0, Math.min(runtime.dispImgH - runtime.boxH, runtime.boxY));
+  setBoxPosition(
+    runtime,
+    Math.max(0, Math.min(runtime.dispImgW - runtime.boxW, runtime.boxX)),
+    Math.max(0, Math.min(runtime.dispImgH - runtime.boxH, runtime.boxY)),
+  );
 
   cropBox.style.left = `${runtime.boxX}px`;
   cropBox.style.top = `${runtime.boxY}px`;

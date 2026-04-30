@@ -1,5 +1,13 @@
 import { actions, type AppAction } from '../../app/actions';
+import {
+  bumpSharedBufferVersion,
+  clearBaseRaster,
+  commitBaseRaster,
+  commitGeometry,
+  setBoxPosition,
+} from '../../app/runtime/imageRuntime';
 import type { AppStore } from '../../app/store';
+import type { ControllerHost } from '../../app/controllerHost';
 import type { ImageRuntime } from '../../app/runtime/imageRuntime';
 import type { OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
@@ -54,11 +62,8 @@ type ImageControllerDeps = {
   output: OutputRuntime;
   pica: PicaResizer;
   worker: ImageWorkerClient;
-  clearStatus: () => void;
-  showError: (message: string) => void;
-  clearHistogramView: () => void;
+  host: ControllerHost;
   clearSnap: () => void;
-  resetSession: () => void;
 };
 
 const MAX_EDITOR_WIDTH = 340;
@@ -139,14 +144,14 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
   function toggleMirrorH(): void {
     if (deps.runtime.loadedImg && deps.runtime.dispImgW > 0) {
-      deps.runtime.boxX = deps.runtime.dispImgW - deps.runtime.boxX - deps.runtime.boxW;
+      setBoxPosition(deps.runtime, deps.runtime.dispImgW - deps.runtime.boxX - deps.runtime.boxW, deps.runtime.boxY);
     }
     dispatchAndRetransform(actions.imageToggleMirrorH());
   }
 
   function toggleMirrorV(): void {
     if (deps.runtime.loadedImg && deps.runtime.dispImgH > 0) {
-      deps.runtime.boxY = deps.runtime.dispImgH - deps.runtime.boxY - deps.runtime.boxH;
+      setBoxPosition(deps.runtime, deps.runtime.boxX, deps.runtime.dispImgH - deps.runtime.boxY - deps.runtime.boxH);
     }
     dispatchAndRetransform(actions.imageToggleMirrorV());
   }
@@ -162,16 +167,15 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.runtime.loadedImg = null;
     }
 
-    deps.runtime.cachedBaseRaster = null;
+    clearBaseRaster(deps.runtime);
     deps.runtime.lastIndexedPixels = null;
-    deps.runtime.sharedBufferVersion = 0;
     rasterDirty = true;
 
     deps.elements.sourceCanvas.width = 1;
     deps.elements.sourceCanvas.height = 1;
     getContext2d(deps.elements.workCanvas).clearRect(0, 0, getState().device.targetW, getState().device.targetH);
 
-    deps.resetSession();
+    deps.host.resetSession();
     deps.store.dispatch(actions.imageResetAll());
 
     if (deps.runtime.rotatedSrc) {
@@ -181,11 +185,11 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     }
 
     deps.clearSnap();
-    deps.clearHistogramView();
+    deps.host.clearHistogramView();
   }
 
   async function loadImageFile(file: File): Promise<void> {
-    deps.clearStatus();
+    deps.host.clearStatus();
     unloadImage();
     try {
       deps.store.dispatch(actions.outputSetBaseName(file.name.replace(/\.[^.]+$/, '')));
@@ -198,7 +202,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       await resetEditor();
     } catch (error) {
       unloadImage();
-      deps.showError(error instanceof Error ? error.message : 'Failed to load the selected input.');
+      deps.host.showError(error instanceof Error ? error.message : 'Failed to load the selected input.');
     }
   }
 
@@ -257,14 +261,18 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       ? (deps.runtime.boxY + deps.runtime.boxH / 2) / oldDisplay
       : sourceH / 2;
 
-    deps.runtime.displayScale = geom.displayScale;
-    deps.runtime.workScale = geom.workScale;
-    deps.runtime.dispImgW = geom.dispImgW;
-    deps.runtime.dispImgH = geom.dispImgH;
-    deps.runtime.boxW = Math.min((state.device.targetW / geom.workScale) * geom.displayScale, geom.dispImgW);
-    deps.runtime.boxH = Math.min((state.device.targetH / geom.workScale) * geom.displayScale, geom.dispImgH);
-    deps.runtime.boxX = prevCenterX * geom.displayScale - deps.runtime.boxW / 2;
-    deps.runtime.boxY = prevCenterY * geom.displayScale - deps.runtime.boxH / 2;
+    const boxW = Math.min((state.device.targetW / geom.workScale) * geom.displayScale, geom.dispImgW);
+    const boxH = Math.min((state.device.targetH / geom.workScale) * geom.displayScale, geom.dispImgH);
+    commitGeometry(deps.runtime, {
+      displayScale: geom.displayScale,
+      workScale: geom.workScale,
+      dispImgW: geom.dispImgW,
+      dispImgH: geom.dispImgH,
+      boxW,
+      boxH,
+      boxX: prevCenterX * geom.displayScale - boxW / 2,
+      boxY: prevCenterY * geom.displayScale - boxH / 2,
+    });
 
     redrawSourceCanvas(src, geom.dispImgW, geom.dispImgH);
     frame.style.width = `${Math.min(geom.dispImgW, MAX_EDITOR_WIDTH)}px`;
@@ -381,18 +389,19 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
         pica: deps.pica,
       });
 
-      deps.runtime.cachedBaseRaster = getContext2d(deps.elements.workCanvas).getImageData(
+      const baseRaster = getContext2d(deps.elements.workCanvas).getImageData(
         0, 0, state.device.targetW, state.device.targetH,
       ).data;
+      commitBaseRaster(deps.runtime, baseRaster);
 
-      const sharedBuffer = new SharedArrayBuffer(deps.runtime.cachedBaseRaster.byteLength);
-      new Uint8ClampedArray(sharedBuffer).set(deps.runtime.cachedBaseRaster);
-      deps.runtime.sharedBufferVersion++;
+      const sharedBuffer = new SharedArrayBuffer(baseRaster.byteLength);
+      new Uint8ClampedArray(sharedBuffer).set(baseRaster);
+      const sharedBufferVersion = bumpSharedBufferVersion(deps.runtime);
       deps.worker.setBaseRaster(
         sharedBuffer,
         state.device.targetW,
         state.device.targetH,
-        deps.runtime.sharedBufferVersion,
+        sharedBufferVersion,
       );
 
       rasterDirty = false;

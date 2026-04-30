@@ -1,4 +1,5 @@
 import { createAppController } from './appController';
+import type { ControllerHost } from './controllerHost';
 import { createLoaderRouter } from './loaderRouter';
 import { clearStatus, showError } from './messages';
 import { createGbRuntime } from './runtime/gbRuntime';
@@ -61,6 +62,13 @@ function resetSessionShared(): void {
   });
 }
 
+const host: ControllerHost = {
+  clearStatus: () => clearStatus(store),
+  showError: message => showError(store, message),
+  clearHistogramView,
+  resetSession: resetSessionShared,
+};
+
 const picaInstance = createPicaResizer();
 const workerClient = createImageWorkerClient();
 
@@ -93,11 +101,8 @@ imageController = createImageController({
   output: outputRuntime,
   pica: picaInstance,
   worker: workerClient,
-  clearStatus: () => clearStatus(store),
-  showError: message => showError(store, message),
-  clearHistogramView,
+  host,
   clearSnap,
-  resetSession: resetSessionShared,
 });
 
 gbController = createGbController({
@@ -108,11 +113,8 @@ gbController = createGbController({
   },
   runtime: gbRuntime,
   output: outputRuntime,
-  clearStatus: () => clearStatus(store),
-  showError: message => showError(store, message),
-  clearHistogramView,
+  host,
   validateGbBytes,
-  resetSession: resetSessionShared,
 });
 
 appController = createAppController({

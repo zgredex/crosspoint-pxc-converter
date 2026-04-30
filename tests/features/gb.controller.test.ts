@@ -32,11 +32,13 @@ describe('gb controller', () => {
       elements,
       runtime: createGbRuntime(),
       output: createOutputRuntime(),
-      clearStatus: vi.fn(),
-      showError: vi.fn(),
-      clearHistogramView: vi.fn(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
       validateGbBytes: vi.fn(),
-      resetSession: vi.fn(),
     });
 
     controller.setRotation(180);
@@ -51,11 +53,13 @@ describe('gb controller', () => {
       elements: {} as never,
       runtime: createGbRuntime(),
       output: createOutputRuntime(),
-      clearStatus: vi.fn(),
-      showError: vi.fn(),
-      clearHistogramView: vi.fn(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
       validateGbBytes: vi.fn(),
-      resetSession: vi.fn(),
     });
 
     controller.setZoom(3);

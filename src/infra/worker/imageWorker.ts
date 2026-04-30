@@ -1,24 +1,7 @@
-import { ditherToIndexedGray, type DitherMode } from '../../domain/dither';
+import { ditherToIndexedGray } from '../../domain/dither';
 import { buildHistogram } from '../../domain/histogram';
 import { buildToneLut } from '../../domain/tone';
-
-export type WorkerSettings = {
-  blackPoint: number;
-  whitePoint: number;
-  gammaValue: number;
-  contrastValue: number;
-  invert: boolean;
-  ditherEnabled: boolean;
-  ditherMode: DitherMode;
-};
-
-export type WorkerInMessage =
-  | { type: 'set-base-raster'; buffer: SharedArrayBuffer; width: number; height: number; version: number }
-  | { type: 'process'; settings: WorkerSettings; version: number };
-
-export type WorkerOutMessage =
-  | { type: 'ready' }
-  | { type: 'result'; indexedPixels: ArrayBuffer; histogram: ArrayBuffer; version: number };
+import type { WorkerInMessage, WorkerOutMessage } from './workerProtocol';
 
 let baseRaster: Uint8ClampedArray | null = null;
 let baseWidth = 0;
