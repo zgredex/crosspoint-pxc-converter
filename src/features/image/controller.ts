@@ -1,5 +1,6 @@
 import { actions, type AppAction } from '../../app/actions';
 import {
+  bumpImageSession,
   bumpSharedBufferVersion,
   clearBaseRaster,
   commitBaseRaster,
@@ -77,6 +78,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   let processing = false;
   let processRequested = false;
   let rasterDirty = true;
+  let inFlightProcessSession: number | null = null;
 
   function getActiveSource(): SourceImage {
     const state = getState();
@@ -104,8 +106,14 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (deps.runtime.loadedImg) void refreshTransformedSource();
   }
 
+  function isCurrentSession(sessionVersion: number): boolean {
+    return sessionVersion === deps.runtime.sessionVersion;
+  }
+
   deps.worker.onResult((result) => {
     if (result.version !== deps.runtime.processVersion) return;
+    if (inFlightProcessSession === null) return;
+    if (!isCurrentSession(inFlightProcessSession)) return;
 
     const state = getState();
     deps.runtime.lastIndexedPixels = new Uint8Array(result.indexedPixels);
@@ -157,6 +165,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   }
 
   function unloadImage(): void {
+    const nextSessionVersion = bumpImageSession(deps.runtime);
     if (deps.runtime.convertTimer !== null) {
       cancelAnimationFrame(deps.runtime.convertTimer);
       deps.runtime.convertTimer = null;
@@ -169,7 +178,11 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
     clearBaseRaster(deps.runtime);
     deps.runtime.lastIndexedPixels = null;
+    deps.runtime.autoLevelsGen++;
     rasterDirty = true;
+    processing = false;
+    processRequested = false;
+    inFlightProcessSession = null;
 
     deps.elements.sourceCanvas.width = 1;
     deps.elements.sourceCanvas.height = 1;
@@ -191,16 +204,20 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   async function loadImageFile(file: File): Promise<void> {
     deps.host.clearStatus();
     unloadImage();
+    const sessionVersion = deps.runtime.sessionVersion;
     try {
       deps.store.dispatch(actions.outputSetBaseName(file.name.replace(/\.[^.]+$/, '')));
       deps.store.dispatch(actions.setLoadedType('image'));
-      deps.runtime.loadedImg = await loadImageFromDataUrl(await readFileAsDataUrl(file));
+      const image = await loadImageFromDataUrl(await readFileAsDataUrl(file));
+      if (!isCurrentSession(sessionVersion)) return;
+      deps.runtime.loadedImg = image;
       deps.store.dispatch(actions.imageSetSourceDims({
         width: deps.runtime.loadedImg.naturalWidth,
         height: deps.runtime.loadedImg.naturalHeight,
       }));
       await resetEditor();
     } catch (error) {
+      if (!isCurrentSession(sessionVersion)) return;
       unloadImage();
       deps.host.showError(error instanceof Error ? error.message : 'Failed to load the selected input.');
     }
@@ -345,6 +362,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (!deps.runtime.loadedImg) return;
 
     const state = getState();
+    const sessionVersion = deps.runtime.sessionVersion;
     const gen = ++deps.runtime.autoLevelsGen;
     const src = getActiveSource();
     const tempCanvas = createCanvas(state.device.targetW, state.device.targetH);
@@ -357,7 +375,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       fitBg: state.background,
       pica: deps.pica,
     });
-    if (gen !== deps.runtime.autoLevelsGen) return;
+    if (gen !== deps.runtime.autoLevelsGen || !isCurrentSession(sessionVersion)) return;
 
     const region = getImageAnalysisRegion(plan, state.device.targetW, state.device.targetH);
     const px = getContext2d(tempCanvas).getImageData(region.x, region.y, region.width, region.height).data;
@@ -376,6 +394,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     processRequested = false;
 
     const state = getState();
+    const sessionVersion = deps.runtime.sessionVersion;
 
     if (rasterDirty || !deps.runtime.cachedBaseRaster) {
       const src = getActiveSource();
@@ -388,6 +407,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
         fitBg: state.background,
         pica: deps.pica,
       });
+      if (!isCurrentSession(sessionVersion)) return;
 
       const baseRaster = getContext2d(deps.elements.workCanvas).getImageData(
         0, 0, state.device.targetW, state.device.targetH,
@@ -407,6 +427,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       rasterDirty = false;
     }
 
+    inFlightProcessSession = sessionVersion;
     deps.runtime.processVersion++;
     deps.worker.process(
       {

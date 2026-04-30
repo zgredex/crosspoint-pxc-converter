@@ -1,6 +1,7 @@
 export type ImageRuntime = {
   loadedImg: HTMLImageElement | null;
   rotatedSrc: HTMLCanvasElement | null;
+  readonly sessionVersion: number;
   readonly displayScale: number;
   readonly workScale: number;
   readonly dispImgW: number;
@@ -71,10 +72,17 @@ export function bumpSharedBufferVersion(runtime: ImageRuntime): number {
   return mutable.sharedBufferVersion;
 }
 
+export function bumpImageSession(runtime: ImageRuntime): number {
+  const mutable = asMutableRuntime(runtime);
+  mutable.sessionVersion += 1;
+  return mutable.sessionVersion;
+}
+
 export function createImageRuntime(): ImageRuntime {
   return {
     loadedImg: null,
     rotatedSrc: null,
+    sessionVersion: 0,
     displayScale: 1,
     workScale: 1,
     dispImgW: 0,
