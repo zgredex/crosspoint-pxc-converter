@@ -225,7 +225,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
         width: deps.runtime.loadedImg.naturalWidth,
         height: deps.runtime.loadedImg.naturalHeight,
       }));
-      await resetEditor();
+      await resetEditor(true);
     } catch (error) {
       if (!isCurrentSession(sessionVersion)) return;
       unloadImage();
@@ -333,7 +333,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     return geometryFor(getState().image.editorZoom, src).geom.maxZoom;
   }
 
-  async function resetEditor(): Promise<void> {
+  async function resetEditor(forceCenter?: boolean): Promise<void> {
     const state = getState();
     if (state.image.rotation !== 0 || state.image.mirrorH || state.image.mirrorV) {
       buildRotatedSource(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
@@ -345,7 +345,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.store.dispatch(actions.imageSetEditorZoom(geom.clampedZoom));
     }
     deps.clearSnap();
-    applyGeometry(src, sourceW, sourceH, geom, { kind: 'box' }, true);
+    applyGeometry(src, sourceW, sourceH, geom, { kind: 'box' }, forceCenter);
     rasterDirty = true;
     requestConvert();
   }
@@ -457,7 +457,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (!deps.runtime.loadedImg) return;
     const state = getState();
     buildRotatedSource(deps.runtime, state.image.rotation, state.image.mirrorH, state.image.mirrorV);
-    await resetEditor();
+    await resetEditor(false);
   }
 
   function invalidateBaseRaster(): void {
