@@ -264,7 +264,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     };
   }
 
-  function applyGeometry(src: SourceImage, sourceW: number, sourceH: number, geom: EditorGeometry, anchor: ScrollAnchor): void {
+  function applyGeometry(src: SourceImage, sourceW: number, sourceH: number, geom: EditorGeometry, anchor: ScrollAnchor, forceCenter?: boolean): void {
     const state = getState();
     const oldDisplay = deps.runtime.displayScale || geom.displayScale;
     const frame = deps.elements.sourceFrame;
@@ -281,12 +281,12 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       anchorSy = (anchorFy + frame.scrollTop) / oldDisplay;
     }
 
-    const prevCenterX = deps.runtime.boxW > 0
-      ? (deps.runtime.boxX + deps.runtime.boxW / 2) / oldDisplay
-      : sourceW / 2;
-    const prevCenterY = deps.runtime.boxH > 0
-      ? (deps.runtime.boxY + deps.runtime.boxH / 2) / oldDisplay
-      : sourceH / 2;
+    const prevCenterX = forceCenter || deps.runtime.boxW === 0
+      ? sourceW / 2
+      : (deps.runtime.boxX + deps.runtime.boxW / 2) / oldDisplay;
+    const prevCenterY = forceCenter || deps.runtime.boxH === 0
+      ? sourceH / 2
+      : (deps.runtime.boxY + deps.runtime.boxH / 2) / oldDisplay;
 
     const boxW = Math.min((state.device.targetW / geom.workScale) * geom.displayScale, geom.dispImgW);
     const boxH = Math.min((state.device.targetH / geom.workScale) * geom.displayScale, geom.dispImgH);
@@ -345,7 +345,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.store.dispatch(actions.imageSetEditorZoom(geom.clampedZoom));
     }
     deps.clearSnap();
-    applyGeometry(src, sourceW, sourceH, geom, { kind: 'box' });
+    applyGeometry(src, sourceW, sourceH, geom, { kind: 'box' }, true);
     rasterDirty = true;
     requestConvert();
   }
