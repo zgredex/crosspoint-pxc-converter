@@ -102,7 +102,7 @@ export const initialImageState: ImageState = {
   autoLevelsApplied: false,
   invert: false,
   ditherEnabled: true,
-  ditherMode: 'fs',
+  ditherMode: 'zhou-fang',
   rotation: 0,
   mirrorH: false,
   mirrorV: false,
