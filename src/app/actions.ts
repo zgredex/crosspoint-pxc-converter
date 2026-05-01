@@ -16,6 +16,7 @@ export type AppAction =
   | { type: 'image/setWhitePoint'; whitePoint: number }
   | { type: 'image/resetTone' }
   | { type: 'image/setGamma'; gammaValue: number }
+  | { type: 'image/applyAutoLevels'; blackPoint: number; whitePoint: number; gammaValue: number }
   | { type: 'image/setInvert'; invert: boolean }
   | { type: 'image/setDitherEnabled'; ditherEnabled: boolean }
   | { type: 'image/setDitherMode'; ditherMode: DitherMode }
@@ -52,6 +53,12 @@ export const actions = {
   imageSetWhitePoint: (whitePoint: number): AppAction => ({ type: 'image/setWhitePoint', whitePoint }),
   imageResetTone: (): AppAction => ({ type: 'image/resetTone' }),
   imageSetGamma: (gammaValue: number): AppAction => ({ type: 'image/setGamma', gammaValue }),
+  imageApplyAutoLevels: (blackPoint: number, whitePoint: number, gammaValue: number): AppAction => ({
+    type: 'image/applyAutoLevels',
+    blackPoint,
+    whitePoint,
+    gammaValue,
+  }),
   imageSetInvert: (invert: boolean): AppAction => ({ type: 'image/setInvert', invert }),
   imageSetDitherEnabled: (ditherEnabled: boolean): AppAction => ({ type: 'image/setDitherEnabled', ditherEnabled }),
   imageSetDitherMode: (ditherMode: DitherMode): AppAction => ({ type: 'image/setDitherMode', ditherMode }),

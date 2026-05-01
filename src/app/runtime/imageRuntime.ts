@@ -19,7 +19,7 @@ export type ImageRuntime = {
   autoLevelsGen: number;
 };
 
-export type MutableImageRuntime = {
+type MutableImageRuntime = {
   -readonly [K in keyof ImageRuntime]: ImageRuntime[K];
 };
 
@@ -48,6 +48,18 @@ export function commitGeometry(runtime: ImageRuntime, next: GeometryCommit): voi
   mutable.boxH = next.boxH;
   mutable.boxX = next.boxX;
   mutable.boxY = next.boxY;
+}
+
+export function clearGeometry(runtime: ImageRuntime): void {
+  const mutable = asMutableRuntime(runtime);
+  mutable.displayScale = 1;
+  mutable.workScale = 1;
+  mutable.dispImgW = 0;
+  mutable.dispImgH = 0;
+  mutable.boxW = 0;
+  mutable.boxH = 0;
+  mutable.boxX = 0;
+  mutable.boxY = 0;
 }
 
 export function setBoxPosition(runtime: ImageRuntime, x: number, y: number): void {

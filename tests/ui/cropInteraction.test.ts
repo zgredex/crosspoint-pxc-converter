@@ -102,6 +102,7 @@ describe('setupCropInteraction', () => {
       applyCropBox,
       nudgeCropBoxIntoView,
       scheduleConvert: vi.fn(),
+      onCropRegionChanged: vi.fn(),
     });
 
     (cropBox as unknown as FakeEventHub).emit('mousedown', mouseEvent(100, 100));
@@ -162,6 +163,7 @@ describe('setupCropInteraction', () => {
       applyCropBox: vi.fn(),
       nudgeCropBoxIntoView,
       scheduleConvert: vi.fn(),
+      onCropRegionChanged: vi.fn(),
     });
 
     (sourceFrame as unknown as FakeEventHub).emit('scroll', {} as Event);
@@ -215,6 +217,7 @@ describe('setupCropInteraction', () => {
       applyCropBox: vi.fn(),
       nudgeCropBoxIntoView: vi.fn(),
       scheduleConvert: vi.fn(),
+      onCropRegionChanged: vi.fn(),
     });
 
     const duringDragPrevent = vi.fn();
@@ -283,6 +286,7 @@ describe('setupCropInteraction', () => {
       applyCropBox: vi.fn(),
       nudgeCropBoxIntoView: vi.fn(),
       scheduleConvert: vi.fn(),
+      onCropRegionChanged: vi.fn(),
     });
 
     const whileHoverPrevent = vi.fn();

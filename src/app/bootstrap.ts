@@ -79,6 +79,7 @@ const { clearSnap } = setupImageCropInteraction({
   scheduleConvert: () => imageController.requestConvert(),
   invalidateBaseRaster: () => imageController.invalidateBaseRaster(),
   applyEditorZoom: (zoom, x, y) => imageController.applyEditorZoom(zoom, x, y),
+  notifyCropRegionChanged: () => imageController.notifyCropRegionChanged(),
 });
 
 mountHistogramAutoResize({

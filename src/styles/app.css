@@ -836,6 +836,7 @@ footer code {
   transition: color 0.1s, border-color 0.1s;
 }
 .tone-btn:hover { color: var(--text); border-color: var(--muted); }
+.tone-btn.active { color: var(--accent); border-color: var(--accent-dim); }
 .tone-btns { display: flex; gap: 6px; margin-top: 4px; }
 
 /* Settings two-column panel */

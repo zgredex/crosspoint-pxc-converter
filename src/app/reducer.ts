@@ -23,6 +23,7 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
         image: {
           ...state.image,
           blackPoint: Math.max(0, Math.min(action.blackPoint, state.image.whitePoint - 1)),
+          autoLevelsApplied: false,
         },
       };
     case 'image/setWhitePoint':
@@ -31,6 +32,7 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
         image: {
           ...state.image,
           whitePoint: Math.min(255, Math.max(action.whitePoint, state.image.blackPoint + 1)),
+          autoLevelsApplied: false,
         },
       };
     case 'image/resetTone':
@@ -41,10 +43,25 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
           blackPoint: initialImageState.blackPoint,
           whitePoint: initialImageState.whitePoint,
           gammaValue: initialImageState.gammaValue,
+          autoLevelsApplied: false,
         },
       };
     case 'image/setGamma':
-      return { ...state, image: { ...state.image, gammaValue: action.gammaValue } };
+      return {
+        ...state,
+        image: { ...state.image, gammaValue: action.gammaValue, autoLevelsApplied: false },
+      };
+    case 'image/applyAutoLevels':
+      return {
+        ...state,
+        image: {
+          ...state.image,
+          blackPoint: Math.max(0, Math.min(action.blackPoint, action.whitePoint - 1)),
+          whitePoint: Math.min(255, Math.max(action.whitePoint, action.blackPoint + 1)),
+          gammaValue: action.gammaValue,
+          autoLevelsApplied: true,
+        },
+      };
     case 'image/setInvert':
       return { ...state, image: { ...state.image, invert: action.invert } };
     case 'image/setDitherEnabled':

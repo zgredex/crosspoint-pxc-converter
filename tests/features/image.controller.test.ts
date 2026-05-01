@@ -4,7 +4,7 @@ import { actions } from '../../src/app/actions';
 import { reducer } from '../../src/app/reducer';
 import { initialAppState } from '../../src/app/state';
 import type { AppStore } from '../../src/app/store';
-import { createImageRuntime, type MutableImageRuntime } from '../../src/app/runtime/imageRuntime';
+import { commitGeometry, createImageRuntime } from '../../src/app/runtime/imageRuntime';
 import { createOutputRuntime } from '../../src/app/runtime/outputRuntime';
 import { createImageController } from '../../src/features/image/controller';
 import type { WorkerOutMessage } from '../../src/infra/worker/workerProtocol';
@@ -296,11 +296,71 @@ describe('image controller', () => {
     deferred.resolve();
     await autoLevelsPromise;
 
-    expect(store.actions).not.toContainEqual(expect.objectContaining({ type: 'image/setBlackPoint' }));
-    expect(store.actions).not.toContainEqual(expect.objectContaining({ type: 'image/setWhitePoint' }));
-    expect(store.actions).not.toContainEqual(expect.objectContaining({ type: 'image/setGamma' }));
+    expect(store.actions).not.toContainEqual(expect.objectContaining({ type: 'image/applyAutoLevels' }));
 
     vi.unstubAllGlobals();
+  });
+
+  it('notifyCropRegionChanged debounces and re-runs autoLevels only when applied flag is set', async () => {
+    const MockImage = stubHtmlImageElement();
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    vi.useFakeTimers();
+    renderImageBaseRasterMock.mockReset();
+    renderImageBaseRasterMock.mockResolvedValue();
+
+    const baseState = {
+      ...initialAppState,
+      loadedType: 'image' as const,
+      image: { ...initialAppState.image, sourceDims: { width: 100, height: 100 } },
+    };
+    const runtime = createImageRuntime();
+    runtime.loadedImg = new MockImage(100, 100) as unknown as HTMLImageElement;
+
+    const idleStore = createMockStore(baseState);
+    const idleController = createImageController({
+      store: idleStore,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker: createMockWorker(),
+      host: { clearStatus: vi.fn(), showError: vi.fn(), clearHistogramView: vi.fn(), resetSession: vi.fn() },
+      clearSnap: vi.fn(),
+    });
+    idleController.notifyCropRegionChanged();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(idleStore.actions).not.toContainEqual(expect.objectContaining({ type: 'image/applyAutoLevels' }));
+
+    const activeStore = createMockStore({
+      ...baseState,
+      image: { ...baseState.image, autoLevelsApplied: true },
+    });
+    const activeController = createImageController({
+      store: activeStore,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker: createMockWorker(),
+      host: { clearStatus: vi.fn(), showError: vi.fn(), clearHistogramView: vi.fn(), resetSession: vi.fn() },
+      clearSnap: vi.fn(),
+    });
+
+    activeController.notifyCropRegionChanged();
+    activeController.notifyCropRegionChanged();
+    activeController.notifyCropRegionChanged();
+    expect(activeStore.actions).not.toContainEqual(expect.objectContaining({ type: 'image/applyAutoLevels' }));
+
+    await vi.advanceTimersByTimeAsync(500);
+    const applyActions = activeStore.actions.filter(
+      action => (action as { type: string }).type === 'image/applyAutoLevels',
+    );
+    expect(applyActions).toHaveLength(1);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    renderImageBaseRasterMock.mockReset();
   });
 
   it('zeros runtime geometry fields on unload', () => {
@@ -310,16 +370,17 @@ describe('image controller', () => {
       loadedType: 'image',
     });
     const runtime = createImageRuntime();
-    const mutable = runtime as MutableImageRuntime;
     runtime.loadedImg = new MockImage() as unknown as HTMLImageElement;
-    mutable.displayScale = 2.5;
-    mutable.workScale = 1.8;
-    mutable.dispImgW = 500;
-    mutable.dispImgH = 400;
-    mutable.boxW = 200;
-    mutable.boxH = 150;
-    mutable.boxX = 100;
-    mutable.boxY = 75;
+    commitGeometry(runtime, {
+      displayScale: 2.5,
+      workScale: 1.8,
+      dispImgW: 500,
+      dispImgH: 400,
+      boxW: 200,
+      boxH: 150,
+      boxX: 100,
+      boxY: 75,
+    });
 
     const controller = createImageController({
       store,

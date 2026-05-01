@@ -60,6 +60,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
 
     const state = deps.store.getState();
     if (deps.imageRuntime.loadedImg) {
+      deps.imageController.notifyCropRegionChanged();
       void deps.imageController.resetEditor();
       return;
     }
@@ -101,6 +102,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
   }
 
   function setImageMode(mode: 'crop' | 'fit'): void {
+    if (deps.imageRuntime.loadedImg) deps.imageController.notifyCropRegionChanged();
     deps.store.dispatch(actions.imageSetMode(mode));
     handleImageLayoutChange();
   }

@@ -25,6 +25,7 @@ function createController(state = initialAppState) {
     setRotation: vi.fn(),
     setZoom: vi.fn(),
     unloadImage: vi.fn(),
+    notifyCropRegionChanged: vi.fn(),
   };
   const gbController = {
     buildOutput: vi.fn(),

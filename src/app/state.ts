@@ -47,6 +47,7 @@ export type ImageState = {
   blackPoint: number;
   whitePoint: number;
   gammaValue: number;
+  autoLevelsApplied: boolean;
   invert: boolean;
   ditherEnabled: boolean;
   ditherMode: DitherMode;
@@ -98,6 +99,7 @@ export const initialImageState: ImageState = {
   blackPoint: 0,
   whitePoint: 255,
   gammaValue: 1.0,
+  autoLevelsApplied: false,
   invert: false,
   ditherEnabled: true,
   ditherMode: 'fs',

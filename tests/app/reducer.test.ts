@@ -99,6 +99,21 @@ describe('app reducer', () => {
     expect(reset.image.sourceDims).toBeNull();
   });
 
+  it('marks autoLevelsApplied via image/applyAutoLevels and clears it on manual edits', () => {
+    const applied = reducer(initialAppState, actions.imageApplyAutoLevels(40, 220, 1.2));
+    expect(applied.image.autoLevelsApplied).toBe(true);
+    expect(applied.image.blackPoint).toBe(40);
+    expect(applied.image.whitePoint).toBe(220);
+    expect(applied.image.gammaValue).toBe(1.2);
+
+    expect(reducer(applied, actions.imageSetBlackPoint(50)).image.autoLevelsApplied).toBe(false);
+    expect(reducer(applied, actions.imageSetWhitePoint(200)).image.autoLevelsApplied).toBe(false);
+    expect(reducer(applied, actions.imageSetGamma(1.5)).image.autoLevelsApplied).toBe(false);
+    expect(reducer(applied, actions.imageResetTone()).image.autoLevelsApplied).toBe(false);
+    expect(reducer(applied, actions.imageResetAll()).image.autoLevelsApplied).toBe(false);
+    expect(reducer(applied, actions.imageSetContrast(15)).image.autoLevelsApplied).toBe(true);
+  });
+
   it('stores and clears UI status messages', () => {
     const withMessage = reducer(initialAppState, actions.uiSetMessage('error', 'Bad input'));
 

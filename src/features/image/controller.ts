@@ -3,13 +3,14 @@ import {
   bumpImageSession,
   bumpSharedBufferVersion,
   clearBaseRaster,
+  clearGeometry,
   commitBaseRaster,
   commitGeometry,
   setBoxPosition,
 } from '../../app/runtime/imageRuntime';
 import type { AppStore } from '../../app/store';
 import type { ControllerHost } from '../../app/controllerHost';
-import type { ImageRuntime, MutableImageRuntime } from '../../app/runtime/imageRuntime';
+import type { ImageRuntime } from '../../app/runtime/imageRuntime';
 import type { OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
 import { createCanvas, getContext2d } from '../../infra/canvas/context';
@@ -36,6 +37,7 @@ export type ImageController = {
   unloadImage(): void;
   resetEditor(): Promise<void>;
   autoLevels(): Promise<void>;
+  notifyCropRegionChanged(): void;
   requestConvert(): void;
   invalidateBaseRaster(): void;
   refreshTransformedSource(): Promise<void>;
@@ -79,6 +81,9 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   let processRequested = false;
   let rasterDirty = true;
   let inFlightProcessSession: number | null = null;
+  let autoLevelsRefreshTimer: number | null = null;
+
+  const AUTO_LEVELS_REFRESH_MS = 200;
 
   function getActiveSource(): SourceImage {
     const state = getState();
@@ -142,6 +147,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   }
 
   function setRotation(rotation: Rotation): void {
+    notifyCropRegionChanged();
     dispatchAndRetransform(actions.imageSetRotation(rotation));
   }
 
@@ -151,6 +157,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   }
 
   function toggleMirrorH(): void {
+    notifyCropRegionChanged();
     if (deps.runtime.loadedImg && deps.runtime.dispImgW > 0) {
       setBoxPosition(deps.runtime, deps.runtime.dispImgW - deps.runtime.boxX - deps.runtime.boxW, deps.runtime.boxY);
     }
@@ -158,6 +165,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   }
 
   function toggleMirrorV(): void {
+    notifyCropRegionChanged();
     if (deps.runtime.loadedImg && deps.runtime.dispImgH > 0) {
       setBoxPosition(deps.runtime, deps.runtime.boxX, deps.runtime.dispImgH - deps.runtime.boxY - deps.runtime.boxH);
     }
@@ -170,16 +178,12 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       cancelAnimationFrame(deps.runtime.convertTimer);
       deps.runtime.convertTimer = null;
     }
+    if (autoLevelsRefreshTimer !== null) {
+      clearTimeout(autoLevelsRefreshTimer);
+      autoLevelsRefreshTimer = null;
+    }
 
-    const mutable = deps.runtime as MutableImageRuntime;
-    mutable.displayScale = 1;
-    mutable.workScale = 1;
-    mutable.dispImgW = 0;
-    mutable.dispImgH = 0;
-    mutable.boxW = 0;
-    mutable.boxH = 0;
-    mutable.boxX = 0;
-    mutable.boxY = 0;
+    clearGeometry(deps.runtime);
 
     if (deps.runtime.loadedImg) {
       deps.runtime.loadedImg.src = '';
@@ -365,6 +369,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       deps.store.dispatch(actions.imageSetEditorZoom(geom.clampedZoom));
     }
     rasterDirty = true;
+    notifyCropRegionChanged();
     requestConvert();
   }
 
@@ -391,10 +396,18 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     const px = getContext2d(tempCanvas).getImageData(region.x, region.y, region.width, region.height).data;
     const levels = computeAutoLevels(buildUintHistogram(buildLuminanceBuffer(px)), region.pixelCount);
 
-    deps.store.dispatch(actions.imageSetBlackPoint(levels.blackPoint));
-    deps.store.dispatch(actions.imageSetWhitePoint(levels.whitePoint));
-    deps.store.dispatch(actions.imageSetGamma(1.0));
+    deps.store.dispatch(actions.imageApplyAutoLevels(levels.blackPoint, levels.whitePoint, 1.0));
     requestConvert();
+  }
+
+  function notifyCropRegionChanged(): void {
+    if (!getState().image.autoLevelsApplied) return;
+    if (autoLevelsRefreshTimer !== null) clearTimeout(autoLevelsRefreshTimer);
+    autoLevelsRefreshTimer = setTimeout(() => {
+      autoLevelsRefreshTimer = null;
+      if (!getState().image.autoLevelsApplied) return;
+      void autoLevels();
+    }, AUTO_LEVELS_REFRESH_MS) as unknown as number;
   }
 
   async function convert(): Promise<void> {
@@ -469,6 +482,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     unloadImage,
     resetEditor,
     autoLevels,
+    notifyCropRegionChanged,
     requestConvert,
     invalidateBaseRaster,
     refreshTransformedSource,

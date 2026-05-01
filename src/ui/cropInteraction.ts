@@ -24,6 +24,7 @@ type CropInteractionDeps = {
   applyCropBox: (scrollIntoView?: boolean) => void;
   nudgeCropBoxIntoView: (margin?: number) => void;
   scheduleConvert: () => void;
+  onCropRegionChanged: () => void;
 };
 
 export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: () => void } {
@@ -131,6 +132,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     if (!isDragging) return;
     isDragging = false;
     window.setTimeout(clearSnap, 600);
+    if (didDrag) deps.onCropRegionChanged();
     deps.scheduleConvert();
   }
 
@@ -176,6 +178,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     const rect = deps.sourceCanvas.getBoundingClientRect();
     deps.setBoxPosition((event.clientX - rect.left) - boxW / 2, (event.clientY - rect.top) - boxH / 2);
     deps.applyCropBox();
+    deps.onCropRegionChanged();
     deps.scheduleConvert();
   });
 

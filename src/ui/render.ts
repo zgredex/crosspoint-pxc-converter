@@ -51,6 +51,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.posSection.classList.toggle('disabled', state.image.mode === 'crop');
   dom.mirrorHBtn.classList.toggle('active', state.image.mirrorH);
   dom.mirrorVBtn.classList.toggle('active', state.image.mirrorV);
+  dom.autoLevelsBtn.classList.toggle('active', state.image.autoLevelsApplied);
 
   dom.invertToggle.checked = state.image.invert;
   dom.ditherToggle.checked = state.image.ditherEnabled;
