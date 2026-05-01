@@ -9,7 +9,7 @@ import {
 } from '../../app/runtime/imageRuntime';
 import type { AppStore } from '../../app/store';
 import type { ControllerHost } from '../../app/controllerHost';
-import type { ImageRuntime } from '../../app/runtime/imageRuntime';
+import type { ImageRuntime, MutableImageRuntime } from '../../app/runtime/imageRuntime';
 import type { OutputRuntime } from '../../app/runtime/outputRuntime';
 import type { Rotation } from '../../app/state';
 import { createCanvas, getContext2d } from '../../infra/canvas/context';
@@ -170,6 +170,16 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       cancelAnimationFrame(deps.runtime.convertTimer);
       deps.runtime.convertTimer = null;
     }
+
+    const mutable = deps.runtime as MutableImageRuntime;
+    mutable.displayScale = 1;
+    mutable.workScale = 1;
+    mutable.dispImgW = 0;
+    mutable.dispImgH = 0;
+    mutable.boxW = 0;
+    mutable.boxH = 0;
+    mutable.boxX = 0;
+    mutable.boxY = 0;
 
     if (deps.runtime.loadedImg) {
       deps.runtime.loadedImg.src = '';

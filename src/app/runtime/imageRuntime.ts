@@ -19,7 +19,7 @@ export type ImageRuntime = {
   autoLevelsGen: number;
 };
 
-type MutableImageRuntime = {
+export type MutableImageRuntime = {
   -readonly [K in keyof ImageRuntime]: ImageRuntime[K];
 };
 

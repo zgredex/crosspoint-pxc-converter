@@ -4,7 +4,7 @@ import { actions } from '../../src/app/actions';
 import { reducer } from '../../src/app/reducer';
 import { initialAppState } from '../../src/app/state';
 import type { AppStore } from '../../src/app/store';
-import { createImageRuntime } from '../../src/app/runtime/imageRuntime';
+import { createImageRuntime, type MutableImageRuntime } from '../../src/app/runtime/imageRuntime';
 import { createOutputRuntime } from '../../src/app/runtime/outputRuntime';
 import { createImageController } from '../../src/features/image/controller';
 import type { WorkerOutMessage } from '../../src/infra/worker/workerProtocol';
@@ -299,6 +299,55 @@ describe('image controller', () => {
     expect(store.actions).not.toContainEqual(expect.objectContaining({ type: 'image/setBlackPoint' }));
     expect(store.actions).not.toContainEqual(expect.objectContaining({ type: 'image/setWhitePoint' }));
     expect(store.actions).not.toContainEqual(expect.objectContaining({ type: 'image/setGamma' }));
+
+    vi.unstubAllGlobals();
+  });
+
+  it('zeros runtime geometry fields on unload', () => {
+    const MockImage = stubHtmlImageElement();
+    const store = createMockStore({
+      ...initialAppState,
+      loadedType: 'image',
+    });
+    const runtime = createImageRuntime();
+    const mutable = runtime as MutableImageRuntime;
+    runtime.loadedImg = new MockImage() as unknown as HTMLImageElement;
+    mutable.displayScale = 2.5;
+    mutable.workScale = 1.8;
+    mutable.dispImgW = 500;
+    mutable.dispImgH = 400;
+    mutable.boxW = 200;
+    mutable.boxH = 150;
+    mutable.boxX = 100;
+    mutable.boxY = 75;
+
+    const controller = createImageController({
+      store,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker: createMockWorker(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
+      clearSnap: vi.fn(),
+    });
+
+    controller.unloadImage();
+
+    expect(runtime.displayScale).toBe(1);
+    expect(runtime.workScale).toBe(1);
+    expect(runtime.dispImgW).toBe(0);
+    expect(runtime.dispImgH).toBe(0);
+    expect(runtime.boxW).toBe(0);
+    expect(runtime.boxH).toBe(0);
+    expect(runtime.boxX).toBe(0);
+    expect(runtime.boxY).toBe(0);
+    expect(runtime.loadedImg).toBeNull();
 
     vi.unstubAllGlobals();
   });
