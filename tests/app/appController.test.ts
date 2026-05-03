@@ -153,7 +153,7 @@ describe('appController', () => {
     controller.downloadPxc();
     controller.downloadBmp();
 
-    expect(downloadSpy).toHaveBeenNthCalledWith(1, output.pxcBytes, 'sample.pxc', 'application/octet-stream');
-    expect(downloadSpy).toHaveBeenNthCalledWith(2, output.bmpBytes, 'sample.bmp', 'image/bmp');
+    expect(downloadSpy).toHaveBeenNthCalledWith(1, output.pxcBytes, 'sample-X4.pxc', 'application/octet-stream');
+    expect(downloadSpy).toHaveBeenNthCalledWith(2, output.bmpBytes, 'sample-X4.bmp', 'image/bmp');
   });
 });

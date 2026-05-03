@@ -171,11 +171,12 @@ export function createAppController(deps: AppControllerDeps): AppController {
     mime: string,
   ): void {
     const state = deps.store.getState();
-    const suffix =
+    const ditherSuffix =
       state.loadedType === 'image' && state.image.ditherEnabled
         ? `-${DITHER_FILENAME_SUFFIX[state.image.ditherMode]}`
         : '';
-    const filename = `${state.output.baseName}${suffix}.${ext}`;
+    const deviceSuffix = `-${state.device.key.toUpperCase()}`;
+    const filename = `${state.output.baseName}${ditherSuffix}${deviceSuffix}.${ext}`;
     if (state.loadedType === 'image') {
       const px = deps.imageRuntime.lastIndexedPixels;
       if (!px) return;
