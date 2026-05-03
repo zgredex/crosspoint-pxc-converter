@@ -26,6 +26,7 @@ describe('buildImageRenderPlan', () => {
       boxY: 0,
       boxW: 0,
       boxH: 0,
+      aspectRatioLocked: true,
     })).toEqual({
       srcX: 0,
       srcY: 0,
@@ -51,6 +52,7 @@ describe('buildImageRenderPlan', () => {
       boxY: 20,
       boxW: 120,
       boxH: 200,
+      aspectRatioLocked: true,
     })).toEqual({
       srcX: 20,
       srcY: 40,
@@ -76,6 +78,7 @@ describe('buildImageRenderPlan', () => {
       boxY: 0,
       boxW: 600,
       boxH: 400,
+      aspectRatioLocked: false,
     });
     expect(plan).toMatchObject({
       srcX: 0,
@@ -87,6 +90,53 @@ describe('buildImageRenderPlan', () => {
     });
     expect(plan.offsetY).toBeCloseTo(240, 5);
     expect(plan.offsetX).toBeCloseTo(0, 5);
+  });
+
+  it('unlocked-AR crop absorbs a 1-px rounding drift on the loser axis', () => {
+    // srcW=1000, srcH=1665 => ratio 0.6006 vs target 0.6; height-driven cropFitScale = 0.48.
+    // rawFittedHeight = round(1665 * 0.48) = 799 (1 px short of targetH=800).
+    // Without the snap-up, fitAlign='mc' would render a 1-px fit-bg line on top of the preview.
+    const plan = buildImageRenderPlan({
+      mode: 'crop',
+      sourceW: 4000,
+      sourceH: 4000,
+      targetW: 480,
+      targetH: 800,
+      fitAlign: 'mc',
+      displayScale: 1,
+      boxX: 0,
+      boxY: 0,
+      boxW: 1000,
+      boxH: 1665,
+      aspectRatioLocked: false,
+    });
+    expect(plan.fittedWidth).toBe(480);
+    expect(plan.fittedHeight).toBe(800);
+    expect(plan.offsetX).toBe(0);
+    expect(plan.offsetY).toBe(0);
+  });
+
+  it('locked-AR crop fills the device exactly even when box/displayScale rounds the source ratio off-target', () => {
+    // displayScale chosen so round(boxW/displayScale)/round(boxH/displayScale) drifts from 480/800.
+    // Without the locked-AR fill guarantee, fittedWidth would land at 479 and leave a 1-px sliver.
+    const plan = buildImageRenderPlan({
+      mode: 'crop',
+      sourceW: 2000,
+      sourceH: 3000,
+      targetW: 480,
+      targetH: 800,
+      fitAlign: 'mc',
+      displayScale: 480.5 / 999,
+      boxX: 0,
+      boxY: 0,
+      boxW: 480.5,
+      boxH: 480.5 * (800 / 480),
+      aspectRatioLocked: true,
+    });
+    expect(plan.fittedWidth).toBe(480);
+    expect(plan.fittedHeight).toBe(800);
+    expect(plan.offsetX).toBe(0);
+    expect(plan.offsetY).toBe(0);
   });
 });
 

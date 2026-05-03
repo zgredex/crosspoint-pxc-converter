@@ -106,6 +106,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       boxY: deps.runtime.boxY,
       boxW: deps.runtime.boxW,
       boxH: deps.runtime.boxH,
+      aspectRatioLocked: state.image.aspectRatioLocked,
     });
   }
 

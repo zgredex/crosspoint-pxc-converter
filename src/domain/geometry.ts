@@ -56,8 +56,11 @@ export function computeEditorGeometry(params: {
 }
 
 export function fitOffset(fw: number, fh: number, targetW: number, targetH: number, pos: FitAlign): { x: number; y: number } {
-  const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? (targetW - fw) / 2 : targetW - fw;
-  const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? (targetH - fh) / 2 : targetH - fh;
+  // Center offsets must round to whole pixels: drawImage at a sub-pixel offset blends the
+  // resized canvas's rim with the fit-bg fillRect underneath, producing a faint colored line
+  // visible at the edge of the preview. Side-pinned offsets are already integer.
+  const x = pos[1] === 'l' ? 0 : pos[1] === 'c' ? Math.round((targetW - fw) / 2) : targetW - fw;
+  const y = pos[0] === 't' ? 0 : pos[0] === 'm' ? Math.round((targetH - fh) / 2) : targetH - fh;
   return { x, y };
 }
 
@@ -100,6 +103,7 @@ export function buildImageRenderPlan(params: {
   boxY: number;
   boxW: number;
   boxH: number;
+  aspectRatioLocked: boolean;
 }): ImageRenderPlan {
   if (params.mode === 'fit') {
     const fitScale = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
@@ -122,9 +126,31 @@ export function buildImageRenderPlan(params: {
   const srcY = Math.max(0, Math.round(params.boxY / params.displayScale));
   const srcW = Math.max(1, Math.min(params.sourceW - srcX, Math.round(params.boxW / params.displayScale)));
   const srcH = Math.max(1, Math.min(params.sourceH - srcY, Math.round(params.boxH / params.displayScale)));
+
+  // Locked-AR crop is a contract: the box matches the device aspect ratio, so the output must
+  // fill the device exactly. Rounding `boxW/H ÷ displayScale` to integer source pixels can drift
+  // the srcW/srcH ratio by a fraction, which would otherwise leave a 1-px fit-bg sliver on one rim.
+  if (params.aspectRatioLocked) {
+    return {
+      srcX,
+      srcY,
+      srcW,
+      srcH,
+      fittedWidth: params.targetW,
+      fittedHeight: params.targetH,
+      offsetX: 0,
+      offsetY: 0,
+    };
+  }
+
   const cropFitScale = Math.min(params.targetW / srcW, params.targetH / srcH);
-  const fittedWidth = Math.max(1, Math.round(srcW * cropFitScale));
-  const fittedHeight = Math.max(1, Math.round(srcH * cropFitScale));
+  const rawFittedWidth = Math.max(1, Math.round(srcW * cropFitScale));
+  const rawFittedHeight = Math.max(1, Math.round(srcH * cropFitScale));
+  // cropFitScale's min branch lands one axis exactly on its target; the other can round 1 px
+  // short due to integer srcW/srcH from box-÷-displayScale rounding. Snap that 1-px deficit up
+  // so we don't render a 1-px fit-bg sliver at the rim. Real letterboxes are far larger.
+  const fittedWidth = params.targetW - rawFittedWidth === 1 ? params.targetW : rawFittedWidth;
+  const fittedHeight = params.targetH - rawFittedHeight === 1 ? params.targetH : rawFittedHeight;
   const offset = fitOffset(fittedWidth, fittedHeight, params.targetW, params.targetH, params.fitAlign);
 
   return {
