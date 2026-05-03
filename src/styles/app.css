@@ -688,6 +688,17 @@ footer code {
   font-weight: 600;
   color: #d8d8df;
 }
+.author-credit {
+  margin: 6px 0 0;
+  font-size: 0.72rem;
+  color: var(--muted2);
+}
+.author-credit a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--border);
+}
+.author-credit a:hover { color: var(--text); }
 
 /* Rotation buttons */
 .rotate-group {

@@ -212,3 +212,9 @@ The dither / tone pipeline runs in a Web Worker over a `SharedArrayBuffer` (see 
 ## Related
 
 - [CrossPoint firmware](https://github.com/crosspoint-reader/crosspoint-reader) — the e-reader firmware this tool targets.
+
+---
+
+## Author
+
+Built by [zgredex](https://github.com/zgredex) · Discord `Megabit_Omega`
