@@ -66,9 +66,13 @@ export function fitOffset(fw: number, fh: number, targetW: number, targetH: numb
 
 // Clamp a candidate crop box (in source pixels) to satisfy:
 //   - source bounds: 1 ≤ srcW ≤ sourceW, 1 ≤ srcH ≤ sourceH
-//   - no upscale: min(targetW/srcW, targetH/srcH) ≤ 1, i.e. srcW ≥ targetW OR srcH ≥ targetH
-// `driving` says which axis the user is actively changing — when the candidate
-// violates no-upscale, the *other* axis is forced to its target minimum.
+//   - no upscale: cropFitScale = min(targetW/srcW, targetH/srcH) ≤ 1.
+// `min(a,b) ≤ 1` requires *both* a ≤ 1 and b ≤ 1 in this codebase's invariant: an OR rule
+// (one axis ≥ target) lets the user shrink the other axis to a 1-pixel sliver, producing a
+// fittedWidth/Height of 1 inside a `fillRect` device canvas — i.e. an empty/all-bg preview.
+// So both axes must be ≥ target, capped at source. When `sourceX < targetX`, upscale on that
+// axis is unavoidable; the rule degrades to `srcX ≥ sourceX` (i.e. you must keep the full
+// source on that axis), which is the closest we can get to "no upscale" given the source.
 export function clampCropBox(params: {
   srcW: number;
   srcH: number;
@@ -76,18 +80,11 @@ export function clampCropBox(params: {
   sourceH: number;
   targetW: number;
   targetH: number;
-  driving: 'w' | 'h' | 'both';
 }): { srcW: number; srcH: number } {
   let srcW = Math.max(1, Math.min(params.sourceW, Math.round(params.srcW)));
   let srcH = Math.max(1, Math.min(params.sourceH, Math.round(params.srcH)));
-  const minTW = Math.min(params.targetW, params.sourceW);
-  const minTH = Math.min(params.targetH, params.sourceH);
-
-  if (srcW < minTW && srcH < minTH) {
-    if (params.driving === 'w') srcW = minTW;
-    else if (params.driving === 'h') srcH = minTH;
-    else { srcW = minTW; srcH = minTH; }
-  }
+  srcW = Math.max(srcW, Math.min(params.targetW, params.sourceW));
+  srcH = Math.max(srcH, Math.min(params.targetH, params.sourceH));
   return { srcW, srcH };
 }
 

@@ -323,7 +323,6 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
           sourceH,
           targetW: state.device.targetW,
           targetH: state.device.targetH,
-          driving: 'both',
         });
         boxW = clamped.srcW * geom.displayScale;
         boxH = clamped.srcH * geom.displayScale;

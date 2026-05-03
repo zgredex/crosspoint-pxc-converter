@@ -165,36 +165,36 @@ describe('clampCropBox', () => {
   const SOURCE = { sourceW: 2000, sourceH: 1500, targetW: 480, targetH: 800 };
 
   it('passes through a box that already satisfies all constraints', () => {
-    expect(clampCropBox({ ...SOURCE, srcW: 600, srcH: 1000, driving: 'both' })).toEqual({ srcW: 600, srcH: 1000 });
+    expect(clampCropBox({ ...SOURCE, srcW: 600, srcH: 1000 })).toEqual({ srcW: 600, srcH: 1000 });
   });
 
   it('clamps to source bounds', () => {
-    expect(clampCropBox({ ...SOURCE, srcW: 5000, srcH: 5000, driving: 'both' })).toEqual({ srcW: 2000, srcH: 1500 });
+    expect(clampCropBox({ ...SOURCE, srcW: 5000, srcH: 5000 })).toEqual({ srcW: 2000, srcH: 1500 });
   });
 
-  it('rejects a sub-target shrink on the driving width axis', () => {
-    // user is dragging width to 200; height is 200 too — both below target. With driving='w',
-    // pin width at targetW so the drag stops at the no-upscale boundary.
-    expect(clampCropBox({ ...SOURCE, srcW: 200, srcH: 200, driving: 'w' })).toEqual({ srcW: 480, srcH: 200 });
+  it('rejects a sub-target shrink on the width axis even when height is at target', () => {
+    // The OR-rule predecessor allowed this case (srcH==targetH satisfies one-axis-≥-target),
+    // producing a 200px-wide sliver inside the 480x800 device — empty/all-bg preview. The
+    // strict rule pins width at target.
+    expect(clampCropBox({ ...SOURCE, srcW: 200, srcH: 800 })).toEqual({ srcW: 480, srcH: 800 });
   });
 
-  it('rejects a sub-target shrink on the driving height axis', () => {
-    expect(clampCropBox({ ...SOURCE, srcW: 200, srcH: 200, driving: 'h' })).toEqual({ srcW: 200, srcH: 800 });
+  it('rejects a sub-target shrink on the height axis even when width is at target', () => {
+    expect(clampCropBox({ ...SOURCE, srcW: 480, srcH: 300 })).toEqual({ srcW: 480, srcH: 800 });
   });
 
   it('pins both axes for corner-driven shrink past the boundary', () => {
-    expect(clampCropBox({ ...SOURCE, srcW: 200, srcH: 200, driving: 'both' })).toEqual({ srcW: 480, srcH: 800 });
+    expect(clampCropBox({ ...SOURCE, srcW: 200, srcH: 200 })).toEqual({ srcW: 480, srcH: 800 });
   });
 
-  it('rounds and floors at 1 px when the candidate is non-integer / zero', () => {
-    // srcH=801 already satisfies no-upscale (>= targetH), so srcW is left at the floored 1.
-    expect(clampCropBox({ ...SOURCE, srcW: 0.4, srcH: 800.6, driving: 'both' })).toEqual({ srcW: 1, srcH: 801 });
+  it('rounds candidates and floors at the target minimum, not at 1', () => {
+    expect(clampCropBox({ ...SOURCE, srcW: 0.4, srcH: 800.6 })).toEqual({ srcW: 480, srcH: 801 });
   });
 
   it('caps target minimum to source size when source is smaller than device target', () => {
     // sourceW=300 < targetW=480; the no-upscale rule can't be enforced on W (source can't reach targetW).
-    // minTW = min(targetW, sourceW) = 300, so the rule effectively becomes srcW >= sourceW.
-    expect(clampCropBox({ sourceW: 300, sourceH: 1500, targetW: 480, targetH: 800, srcW: 100, srcH: 100, driving: 'w' }))
-      .toEqual({ srcW: 300, srcH: 100 });
+    // The rule degrades to srcW >= sourceW: the user must keep the full source on that axis.
+    expect(clampCropBox({ sourceW: 300, sourceH: 1500, targetW: 480, targetH: 800, srcW: 100, srcH: 100 }))
+      .toEqual({ srcW: 300, srcH: 800 });
   });
 });

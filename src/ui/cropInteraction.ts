@@ -158,12 +158,6 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
     deps.scheduleConvert();
   }
 
-  function drivingAxis(handle: HandleDirection): 'w' | 'h' | 'both' {
-    if (handle === 'e' || handle === 'w') return 'w';
-    if (handle === 'n' || handle === 's') return 'h';
-    return 'both';
-  }
-
   function onHandleStart(handle: HandleDirection, event: MouseEvent | TouchEvent): void {
     if (isDragging || isResizing) return;
     if (!isCropEditorActive() || deps.getAspectRatioLocked()) return;
@@ -222,7 +216,6 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
       sourceH: state.sourceH,
       targetW: state.targetW,
       targetH: state.targetH,
-      driving: drivingAxis(resizeHandle),
     });
 
     if (resizeHandle.includes('w')) {
