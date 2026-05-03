@@ -84,7 +84,7 @@ CrossPoint picks at random from `/.sleep/` when multiple files are present. PXC 
 - **Crop / Fit modes** — crop selects a viewport that fills the device exactly; fit letterboxes the whole source. The crop window snaps when its centre aligns with the source centre.
 - **Fit alignment** — 3×3 grid (top-left through bottom-right) controls placement of the letterboxed image. The unused area fills with the chosen background colour (white or black).
 - **Rotation** — 90° clockwise / counter-clockwise steps.
-- **Mirror** — horizontal and vertical flips, applied independently.
+- **Mirror** — horizontal and vertical flips, applied independently. The crop selection is preserved across rotation and mirror operations.
 - **Zoom** — continuous slider from 1× to a per-image maximum (capped so the source never upscales beyond its native pixels), plus mouse-wheel zoom anchored at the cursor.
 - **Scrollable viewport** — the source panel pans when the zoomed image exceeds its frame; scroll position is preserved during zoom changes.
 - **Source label** — displays the loaded asset's natural pixel dimensions, e.g. `Source · 1920×1080 — drag or click to reposition`.
@@ -103,7 +103,7 @@ Controls run in this processing order: black/white-point map → gamma → contr
 | **Gamma** | 0.30–5.00, default 1.00. Applies `Vout = Vin^(1/γ)` after the black/white remap. γ > 1 lifts shadows (brighter, more shadow detail); γ < 1 compresses shadows (darker, more highlight detail). |
 | **Contrast** | ±100 linear adjustment, pivoting at midpoint (128). |
 | **Invert** | Inverts luminance after tone mapping, before dithering. |
-| **Auto** | Sets black and white points from histogram percentile clipping; resets gamma to 1.00. |
+| **Auto** | Sets black and white points from histogram percentile clipping; resets gamma to 1.00. Once enabled, re-runs automatically (debounced) when the crop region changes — rotation, mirror, zoom, or drag — so cropping into a darker or lighter area doesn't strand the levels at stale values. Moving any tone slider manually clears the auto-levels lock. |
 | **Reset all** | Restores black, white, and gamma to defaults. |
 
 ### Dithering
@@ -112,14 +112,14 @@ Every error-diffusion algorithm uses BT.601 luminance in sRGB space and quantise
 
 | Algorithm | Notes |
 |-----------|-------|
-| **Floyd-Steinberg** | Classic 4-neighbour kernel (`7/5/3/1 ÷ 16`). Balanced general-purpose default. |
+| **Zhou-Fang** | **Default.** JJN kernel with serpentine scanning and intensity-dependent coefficient + threshold modulation (Zhou & Fang, SIGGRAPH 2003). Eliminates the "worm" artifacts of single-direction JJN. Strong choice for photographic content on e-ink. |
+| **Floyd-Steinberg** | Classic 4-neighbour kernel (`7/5/3/1 ÷ 16`). Fast and balanced; the textbook reference for error diffusion. |
 | **Atkinson** | Distributes only 6/8 of the error across 6 neighbours. Preserves highlights, produces lighter results — popular for manga. |
 | **Jarvis (JJN)** | 3-row, 12-neighbour kernel (`÷ 48`). Wider error spread, less banding, softer edges. |
 | **Stucki** | JJN-family weights (`÷ 42`). Slightly sharper than Jarvis. |
 | **Burkes** | 2-row Stucki (`÷ 32`). Faster than the 3-row variants while staying sharp. |
 | **Bayer** | 4×4 ordered (threshold) dithering. No error bleeding; produces a regular crosshatch suited to flat illustration with hard edges. |
 | **Blue Noise** | 64×64 pre-computed blue-noise threshold matrix. Ordered like Bayer but with high-frequency noise distribution; clean look on photographic content without the directional bias of error diffusion. |
-| **Zhou-Fang** | JJN kernel with serpentine scanning and intensity-dependent coefficient + threshold modulation (Zhou & Fang, SIGGRAPH 2003). Eliminates the "worm" artifacts of single-direction JJN. Strong choice for photographic content on e-ink. |
 
 A toggle disables dithering altogether for hard-quantised output.
 
