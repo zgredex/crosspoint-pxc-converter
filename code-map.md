@@ -71,7 +71,8 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | File reading | `infra/browser/imageLoader.ts:{readFileAsDataUrl, readFileAsArrayBuffer, readFileAsText, loadImageFromDataUrl}` |
 | Clipboard image read | `infra/browser/clipboard.ts` |
 | Auto-levels analysis | `domain/tone.ts:computeAutoLevels` over `buildLuminanceBuffer` + `buildUintHistogram` |
-| Worker process protocol | `infra/worker/imageWorker.ts` (the worker) ↔ `infra/worker/imageWorkerClient.ts` (the host) |
+| Worker process protocol | Types in `infra/worker/workerProtocol.ts`; worker `infra/worker/imageWorker.ts` ↔ host `infra/worker/imageWorkerClient.ts` |
+| GB display-scale math (default scale, zoom clamp) | `domain/gb/displayScale.ts:computeGbDisplayScale` (used by `features/gb/service.ts:buildGbSourceView` and `ui/render.ts`) |
 
 ---
 
@@ -121,7 +122,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 - **All app state** flows through `actions` + `reducer`. Components subscribe via `store.subscribe(render)`. Never mutate `state` directly.
 - **All large mutable objects** (canvases, timers, indexed pixel buffers, base-raster buffers, generation counters, raw GB bytes, decoded pixel arrays, encoded output byte buffers) live in `app/runtime/{image,gb,output}Runtime.ts`. They are *not* in the store.
 - **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Don't write to them anywhere else.
-- **`runtime.cachedBaseRaster` / `sharedBufferVersion`** are written only by `convert` (image controller). Cleared by `unloadImage`.
+- **`runtime.cachedBaseRaster` / `sharedBufferVersion`** are written only by `convert` (image controller). Cleared by `unloadImage`. Invalidated for next `convert` (forces a pica rebuild) only via `invalidateBaseRaster()` — currently called from `ui/bindings.ts` (fit-position change) and `appController.handleBackgroundChange`.
 - **`output.{pxcBytes,bmpBytes}`** are written only via `setOutputBytes` / `clearOutputBytes` from `outputRuntime.ts` — and only by the GB controller (the image path encodes lazily on download).
 
 ---
@@ -141,13 +142,14 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/app/loaderRouter.ts` | app | Routes a File to image vs gb controller | `createLoaderRouter` |
 | `src/app/appController.ts` | app | Top-level orchestration (device/mode/bg switches, zoom, rotate, download) | `createAppController`, `AppController` |
 | `src/app/sessionReset.ts` | app | Shared unload ritual (clear status, output, preview, file input) | `resetSession` |
+| `src/app/controllerHost.ts` | app | Shared deps shape for image + gb controllers (status, errors, histogram clear, session reset) | `ControllerHost` |
 | `src/app/runtime/imageRuntime.ts` | app | Mutable image-pipeline state (canvases, scales, box, caches, timers, versions) | `ImageRuntime`, `createImageRuntime` |
 | `src/app/runtime/gbRuntime.ts` | app | Mutable GB state (raw bytes, decoded pixels, palette remap) | `GbRuntime`, `createGbRuntime` |
 | `src/app/runtime/outputRuntime.ts` | app | Encoded output bytes | `OutputRuntime`, `createOutputRuntime`, `setOutputBytes`, `clearOutputBytes`, `hasOutput` |
 | `src/domain/geometry.ts` | domain | Editor scales + render plan | `computeEditorGeometry`, `buildImageRenderPlan`, `getImageAnalysisRegion`, `fitOffset` |
 | `src/domain/tone.ts` | domain | Tone LUT + luminance + auto-levels | `buildToneLut`, `buildLuminanceBuffer`, `computeAutoLevels` |
 | `src/domain/histogram.ts` | domain | Histograms (Float32, Uint) | `buildHistogram`, `buildUintHistogram` |
-| `src/domain/dither.ts` | domain | Floyd-Steinberg / Atkinson / blue-noise dither → 4-level indexed | `ditherToIndexedGray`, `DitherMode` |
+| `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise` | `ditherToIndexedGray`, `DitherMode` |
 | `src/domain/blueNoise.ts` | domain | Pre-computed blue-noise threshold matrix | (matrix data) |
 | `src/domain/quantize.ts` | domain | 4-level quantization helpers | quantize fns |
 | `src/domain/devices.ts` | domain | XTeink device specs | `DEVICES`, `DEFAULT_XT`, `DeviceKey` |
@@ -158,6 +160,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/domain/gb/parsePrinterTxt.ts` | domain | Parse GB Printer text logs | `parsePrinterTxt` |
 | `src/domain/gb/rotatePixels.ts` | domain | Rotate flat pixel buffer | `rotatePixels` |
 | `src/domain/gb/constants.ts` | domain | Tile / palette constants | constants |
+| `src/domain/gb/displayScale.ts` | domain | GB display-scale math (default scale clamp from rotated dims) | `computeGbDisplayScale` |
 | `src/infra/browser/imageLoader.ts` | infra | File → DataURL / ArrayBuffer / text / Image | `readFile*`, `loadImageFromDataUrl` |
 | `src/infra/browser/downloads.ts` | infra | Trigger blob download | `triggerDownload` |
 | `src/infra/browser/clipboard.ts` | infra | Read image from clipboard | clipboard helpers |
@@ -168,6 +171,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/infra/canvas/gbSourceRenderer.ts` | infra | GB source canvas painter | `renderGbSourceCanvas` |
 | `src/infra/worker/imageWorker.ts` | infra | Worker entry: tone LUT + histogram + dither | (worker) |
 | `src/infra/worker/imageWorkerClient.ts` | infra | Worker host adapter | `createImageWorkerClient`, `ImageWorkerClient` |
+| `src/infra/worker/workerProtocol.ts` | infra | Worker message contract (single source of truth for host↔worker types) | `WorkerSettings`, `WorkerInMessage`, `WorkerOutMessage` |
 | `src/features/image/controller.ts` | features | Image-pipeline orchestration | `createImageController`, `ImageController` |
 | `src/features/image/source.ts` | features | Rotated/mirrored source canvas | `buildRotatedSource`, `getSourceImage`, `srcW`, `srcH`, `SourceImage` |
 | `src/features/image/service.ts` | features | Output base-raster render (uses pica) | `renderImageBaseRaster` |
@@ -255,6 +259,14 @@ input
   → result → preview + histogram
 ```
 
+### Crop region change → auto-levels rerun (only if previously applied)
+```
+rotate / mirror / zoom / crop drag / crop click
+  → features/image/controller.ts:notifyCropRegionChanged
+  → 200 ms debounce
+  → if state.image.autoLevelsApplied: autoLevels()  (generation-guarded; see Section 8)
+```
+
 ### GB load → preview
 ```
 File picker (binary or .txt)
@@ -334,7 +346,7 @@ Before writing X, use Y:
 | Resize a canvas before output | `stepDownscaleAndResize` | `infra/canvas/picaResize.ts` |
 | Apply tone (gamma/black/white/contrast/invert) | `buildToneLut` | `domain/tone.ts` — never per-pixel branches |
 | Auto-detect black/white points | `computeAutoLevels` (over `buildLuminanceBuffer` + `buildUintHistogram`) | `domain/tone.ts` |
-| Dither a Float32 buffer to 4-level indexed | `ditherToIndexedGray` | `domain/dither.ts` |
+| Dither a Float32 buffer to 4-level indexed | `ditherToIndexedGray` (mode picked from `DitherMode` union — see `domain/dither.ts` for the eight supported modes) | `domain/dither.ts` |
 | Build a histogram | `buildHistogram` (Float32) / `buildUintHistogram` (luminance Uint8) | `domain/histogram.ts` |
 | Draw a histogram | `renderHistogram` | `infra/canvas/histogramRenderer.ts` |
 | Paint indexed-pixel preview | `renderIndexedPreview` | `infra/canvas/previewRenderer.ts` |
@@ -365,6 +377,7 @@ For each interaction, the path it MUST take, and what is forbidden on it.
 | Tone / contrast / gamma slider | cache-hit convert | `requestConvert`, worker `process` against existing SAB | `rasterDirty=true`, re-running pica, sending a new SAB |
 | Black/white-point slider | cache-hit convert | same as tone slider | same |
 | Auto-levels button | async, generation-guarded | pica + `getImageData` allowed | dispatching tone changes after `autoLevelsGen` advances |
+| Auto-levels rerun on crop-region change | debounced (200 ms), generation-guarded | `notifyCropRegionChanged` → `autoLevels()` if `state.image.autoLevelsApplied` | running on the sync wheel/drag path; bypassing `autoLevelsGen` |
 | Mode change (crop ↔ fit) | full rebuild | `resetEditor` → full applyGeometry + raster rebuild | — |
 | Rotation / mirror | full rebuild | rebuilds `rotatedSrc` + `resetEditor` | — |
 | Device change | full rebuild | resizes output canvases + `resetEditor` | — |

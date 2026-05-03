@@ -1,5 +1,5 @@
 import type { AppState } from '../app/state';
-import { selectGbDisplayScale } from '../features/gb/service';
+import { computeGbDisplayScale } from '../domain/gb/displayScale';
 import type { AppDom } from './dom';
 
 function getPanelSection(element: Element): HTMLElement {
@@ -109,7 +109,11 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     dom.zoomSlider.value = String(Math.min(maxZoom, Math.max(1, state.image.editorZoom)));
     dom.zoomSlider.disabled = isFit || zoomLocked;
   } else if (isGb) {
-    const gbZoom = state.gb.zoom > 0 ? state.gb.zoom : selectGbDisplayScale(state);
+    const gbZoom = state.gb.zoom > 0
+      ? state.gb.zoom
+      : state.gb.dims
+        ? computeGbDisplayScale(state.gb.dims.width, state.gb.dims.height, state.gb.rotation, state.gb.zoom)
+        : 1;
     dom.zoomSlider.min = '1';
     dom.zoomSlider.max = '6';
     dom.zoomSlider.step = '1';

@@ -1,7 +1,8 @@
-import type { AppState, FitBackground, GbFileInfo } from '../../app/state';
+import type { FitBackground, GbFileInfo } from '../../app/state';
 import type { GbPaletteKey } from '../../domain/formats/bmpGb';
 import { encodeGbBmp } from '../../domain/formats/bmpGb';
 import { GB_SHADE_NAMES } from '../../domain/gb/constants';
+import { computeGbDisplayScale } from '../../domain/gb/displayScale';
 import { encodePxc } from '../../domain/formats/pxc';
 import { rotatePixels } from '../../domain/gb/rotatePixels';
 
@@ -21,32 +22,6 @@ export type GbOutputArtifacts = {
 };
 
 export type { GbFileInfo };
-
-export function getRotatedDims(
-  width: number,
-  height: number,
-  rotation: 0 | 90 | 180 | 270,
-): { w: number; h: number } {
-  return rotation === 90 || rotation === 270
-    ? { w: height, h: width }
-    : { w: width, h: height };
-}
-
-export function computeGbDisplayScale(
-  width: number,
-  height: number,
-  rotation: 0 | 90 | 180 | 270,
-  zoom: number,
-): number {
-  if (zoom > 0) return zoom;
-  const { w } = getRotatedDims(width, height, rotation);
-  return Math.max(1, Math.min(6, Math.floor(400 / w)));
-}
-
-export function selectGbDisplayScale(state: AppState): number {
-  if (!state.gb.dims) return 1;
-  return computeGbDisplayScale(state.gb.dims.width, state.gb.dims.height, state.gb.rotation, state.gb.zoom);
-}
 
 export function buildGbSourceView(
   pixels: Uint8Array,
