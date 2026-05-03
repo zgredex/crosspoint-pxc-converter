@@ -68,6 +68,8 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | Histogram drawing | `infra/canvas/histogramRenderer.ts:renderHistogram` |
 | Indexed-pixel preview painting | `infra/canvas/previewRenderer.ts:renderIndexedPreview` |
 | File download | `infra/browser/downloads.ts:triggerDownload` |
+| Download filename composition (`{baseName}[-{ditherCode}]-{DEVICE}.{ext}`) | `app/appController.ts:downloadActive` — pulls `state.output.baseName`, image-only `DITHER_FILENAME_SUFFIX[state.image.ditherMode]` when `ditherEnabled`, and uppercased `state.device.key` |
+| Dither-mode → filename short code | `domain/dither.ts:DITHER_FILENAME_SUFFIX` (keyed by `DitherMode`; tested for full coverage in `tests/domain/dither.test.ts`) |
 | Shared session-reset ritual (clearStatus, clear output bytes/state, clear preview, reset file input) | `app/sessionReset.ts:resetSession` — called by both controllers' unload paths |
 | File reading | `infra/browser/imageLoader.ts:{readFileAsDataUrl, readFileAsArrayBuffer, readFileAsText, loadImageFromDataUrl}` |
 | Clipboard image read | `infra/browser/clipboard.ts` |
@@ -150,7 +152,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/domain/geometry.ts` | domain | Editor scales + unified render plan + crop-box clamp | `computeEditorGeometry`, `buildImageRenderPlan`, `clampCropBox`, `getImageAnalysisRegion`, `fitOffset` |
 | `src/domain/tone.ts` | domain | Tone LUT + luminance + auto-levels | `buildToneLut`, `buildLuminanceBuffer`, `computeAutoLevels` |
 | `src/domain/histogram.ts` | domain | Histograms (Float32, Uint) | `buildHistogram`, `buildUintHistogram` |
-| `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise` | `ditherToIndexedGray`, `DitherMode` |
+| `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise` | `ditherToIndexedGray`, `DitherMode`, `DITHER_FILENAME_SUFFIX` |
 | `src/domain/blueNoise.ts` | domain | Pre-computed blue-noise threshold matrix | (matrix data) |
 | `src/domain/quantize.ts` | domain | 4-level quantization helpers | quantize fns |
 | `src/domain/devices.ts` | domain | XTeink device specs | `DEVICES`, `DEFAULT_XT`, `DeviceKey` |

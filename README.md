@@ -165,6 +165,18 @@ The GB-Printer text-log parser reads hex byte lines and extracts the `PRNT` pale
 - **Download .pxc** — CrossPoint native format.
 - **Download .bmp** — 4-bit indexed BMP3 (greyscale palette in image mode, GB colour palette in GB mode).
 
+Filenames are tagged with the dither method (image mode) and target device, so multiple variants of the same source don't collide:
+
+```
+{baseName}[-{ditherCode}]-{DEVICE}.{pxc|bmp}
+```
+
+- `baseName` — the source filename without its extension (defaults to `sleep` before any file is loaded).
+- `ditherCode` — image-mode short code: `fs`, `atk`, `jjn`, `stk`, `bks`, `bay`, `zf` (Zhou-Fang, default), `bn` (Blue Noise). Omitted when dither is off or the source is a GB capture.
+- `DEVICE` — `X3` or `X4`, matching the device pill.
+
+Examples: `earth-zf-X4.pxc`, `earth-atk-X3.bmp`, `mario-X4.pxc` (GB), `earth-X4.pxc` (image, dither off).
+
 ---
 
 ## Development
