@@ -13,6 +13,7 @@ type BindingDeps = {
   appController: Pick<AppController, 'setBackground' | 'setDevice' | 'setGbInvert' | 'setGbPalette' | 'setImageMode'>;
   scheduleConvert: () => void;
   autoLevels: () => void | Promise<void>;
+  invalidateBaseRaster: () => void;
 };
 
 export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
@@ -99,6 +100,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
       const fitAlign = button.dataset.pos;
       if (!fitAlign) return;
       store.dispatch(actions.imageSetFitAlign(fitAlign as FitAlign));
+      deps.invalidateBaseRaster();
       scheduleConvert();
     });
   }

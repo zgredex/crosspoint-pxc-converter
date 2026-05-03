@@ -92,6 +92,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
     }
 
     if (deps.imageRuntime.loadedImg) {
+      deps.imageController.invalidateBaseRaster();
       deps.imageController.requestConvert();
     }
   }

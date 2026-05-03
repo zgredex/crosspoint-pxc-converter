@@ -138,6 +138,7 @@ bindStoreControls(dom, {
   appController,
   scheduleConvert: imageController.requestConvert,
   autoLevels: imageController.autoLevels,
+  invalidateBaseRaster: imageController.invalidateBaseRaster,
 });
 
 setupPreviewZoom({
