@@ -43,7 +43,16 @@
       <p class="zoom-hint" id="zoomHint" hidden></p>
       <div class="source-frame" id="sourceFrame">
         <canvas id="sourceCanvas"></canvas>
-        <div id="cropBox"></div>
+        <div id="cropBox">
+          <div class="crop-handle crop-handle--n" data-handle="n"></div>
+          <div class="crop-handle crop-handle--s" data-handle="s"></div>
+          <div class="crop-handle crop-handle--e" data-handle="e"></div>
+          <div class="crop-handle crop-handle--w" data-handle="w"></div>
+          <div class="crop-handle crop-handle--ne" data-handle="ne"></div>
+          <div class="crop-handle crop-handle--nw" data-handle="nw"></div>
+          <div class="crop-handle crop-handle--se" data-handle="se"></div>
+          <div class="crop-handle crop-handle--sw" data-handle="sw"></div>
+        </div>
         <div id="snapGuideH" class="snap-guide"></div>
         <div id="snapGuideV" class="snap-guide"></div>
       </div>
@@ -86,10 +95,17 @@
         </div>
 
         <div class="panel-section" id="scaleSection">
-          <p class="panel-heading">Scale<button class="help-tip" type="button" data-tip="Fit shows the whole image with empty space filled by the background. Crop selects a region of the source to fill the device exactly." aria-label="About scale mode">?</button></p>
+          <p class="panel-heading">Scale<button class="help-tip" type="button" data-tip="Fit shows the whole image with empty space filled by the background. Crop selects a region of the source to fill the device exactly. Unlock the aspect ratio to crop to a custom shape." aria-label="About scale mode">?</button></p>
           <div class="pill-group">
             <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
             <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
+          </div>
+          <div class="toggle-row" id="aspectRatioLockRow">
+            <span class="toggle-label">Aspect ratio<button class="help-tip" type="button" data-tip="When locked, the crop matches the device shape exactly (default). When unlocked, drag the corner or edge handles to resize freely. Output is letterboxed onto the device using the position grid below." aria-label="About aspect ratio lock">?</button></span>
+            <label class="toggle">
+              <input type="checkbox" id="aspectRatioLockToggle" checked>
+              <span class="toggle-track"></span>
+            </label>
           </div>
         </div>
 

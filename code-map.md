@@ -51,7 +51,8 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | Logic | Canonical home |
 | --- | --- |
 | Editor scale math (`displayScale`, `workScale`, `maxZoom`, clamped zoom, dispImg dims) | `domain/geometry.ts:computeEditorGeometry` |
-| Crop region / fit offsets in source-pixel coordinates | `domain/geometry.ts:buildImageRenderPlan` (used by convert AND autoLevels) |
+| Crop region / fit offsets in source-pixel coordinates | `domain/geometry.ts:buildImageRenderPlan` — single unified `ImageRenderPlan` shape (`srcX/Y/W/H` + `fittedWidth/Height` + `offsetX/Y`) covering fit, AR-locked crop, and AR-unlocked letterboxed crop. Used by convert AND autoLevels. |
+| Crop-box constraint clamp (no-upscale + source bound) | `domain/geometry.ts:clampCropBox` — driving-axis-aware. Called by `applyGeometry` (device/zoom changes) and `cropInteraction` handle drag. |
 | Image source rotation/mirroring | `features/image/source.ts:buildRotatedSource` + `getSourceImage` |
 | Source natural dimensions (display label) | `state.image.sourceDims` set by `features/image/controller.ts:loadImageFile` from `loadedImg.naturalWidth/Height`; GB side reuses `state.gb.dims` set by `features/gb/controller.ts:decodeGbDraw`. Rendered into `sourceLabel` by `ui/render.ts`. |
 | Source-canvas redraw (editor preview, **not** output) | `features/image/controller.ts:redrawSourceCanvas` — native `drawImage`, never pica |
@@ -121,7 +122,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 
 - **All app state** flows through `actions` + `reducer`. Components subscribe via `store.subscribe(render)`. Never mutate `state` directly.
 - **All large mutable objects** (canvases, timers, indexed pixel buffers, base-raster buffers, generation counters, raw GB bytes, decoded pixel arrays, encoded output byte buffers) live in `app/runtime/{image,gb,output}Runtime.ts`. They are *not* in the store.
-- **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Don't write to them anywhere else.
+- **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Drag handlers may move `boxX/boxY` through `setBoxPosition` and resize handlers may move `boxW/boxH` through `setBoxSize` — those are the only other writers, and both are scoped to crop-interaction gestures. Don't write to these fields anywhere else.
 - **`runtime.cachedBaseRaster` / `sharedBufferVersion`** are written only by `convert` (image controller). Cleared by `unloadImage`. Invalidated for next `convert` (forces a pica rebuild) only via `invalidateBaseRaster()` — currently called from `ui/bindings.ts` (fit-position change) and `appController.handleBackgroundChange`.
 - **`output.{pxcBytes,bmpBytes}`** are written only via `setOutputBytes` / `clearOutputBytes` from `outputRuntime.ts` — and only by the GB controller (the image path encodes lazily on download).
 
@@ -146,7 +147,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/app/runtime/imageRuntime.ts` | app | Mutable image-pipeline state (canvases, scales, box, caches, timers, versions) | `ImageRuntime`, `createImageRuntime` |
 | `src/app/runtime/gbRuntime.ts` | app | Mutable GB state (raw bytes, decoded pixels, palette remap) | `GbRuntime`, `createGbRuntime` |
 | `src/app/runtime/outputRuntime.ts` | app | Encoded output bytes | `OutputRuntime`, `createOutputRuntime`, `setOutputBytes`, `clearOutputBytes`, `hasOutput` |
-| `src/domain/geometry.ts` | domain | Editor scales + render plan | `computeEditorGeometry`, `buildImageRenderPlan`, `getImageAnalysisRegion`, `fitOffset` |
+| `src/domain/geometry.ts` | domain | Editor scales + unified render plan + crop-box clamp | `computeEditorGeometry`, `buildImageRenderPlan`, `clampCropBox`, `getImageAnalysisRegion`, `fitOffset` |
 | `src/domain/tone.ts` | domain | Tone LUT + luminance + auto-levels | `buildToneLut`, `buildLuminanceBuffer`, `computeAutoLevels` |
 | `src/domain/histogram.ts` | domain | Histograms (Float32, Uint) | `buildHistogram`, `buildUintHistogram` |
 | `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise` | `ditherToIndexedGray`, `DitherMode` |
@@ -309,7 +310,7 @@ Three monotonically-increasing counters guard async paths.
 | `displayScale` | `number` | `applyGeometry` only | `applyGeometry`, `buildImageRenderPlan`, `applyCropBoxToDom` |
 | `workScale` | `number` | `applyGeometry` only | `applyGeometry`, `buildImageRenderPlan` |
 | `dispImgW` / `dispImgH` | `number` | `applyGeometry` only | `applyCropBoxToDom`, source canvas size |
-| `boxX` / `boxY` / `boxW` / `boxH` | `number` | `applyGeometry`, drag handlers | `applyCropBoxToDom`, `buildImageRenderPlan` |
+| `boxX` / `boxY` / `boxW` / `boxH` | `number` | `applyGeometry`, drag handlers (`setBoxPosition`), resize handlers (`setBoxSize`) | `applyCropBoxToDom`, `buildImageRenderPlan` |
 | `lastHistogram` | `Float32Array \| null` | worker result handler | `mountHistogramAutoResize` |
 | `lastIndexedPixels` | `Uint8Array \| null` | worker result handler | preview render, download path |
 | `cachedBaseRaster` | `Uint8ClampedArray \| null` | `convert` (when `rasterDirty`) | next `convert` calls; SAB copy |
@@ -342,7 +343,8 @@ Before writing X, use Y:
 | Task | Use | Path |
 | --- | --- | --- |
 | Compute editor scales for a new view | `computeEditorGeometry` | `domain/geometry.ts` |
-| Compute crop region in source pixels | `buildImageRenderPlan` | `domain/geometry.ts` |
+| Compute crop region in source pixels | `buildImageRenderPlan` (returns unified plan that also drives fit-letterbox and AR-unlocked crop letterbox) | `domain/geometry.ts` |
+| Clamp a candidate crop box (no-upscale + source bound) | `clampCropBox` | `domain/geometry.ts` |
 | Resize a canvas before output | `stepDownscaleAndResize` | `infra/canvas/picaResize.ts` |
 | Apply tone (gamma/black/white/contrast/invert) | `buildToneLut` | `domain/tone.ts` — never per-pixel branches |
 | Auto-detect black/white points | `computeAutoLevels` (over `buildLuminanceBuffer` + `buildUintHistogram`) | `domain/tone.ts` |
@@ -378,6 +380,7 @@ For each interaction, the path it MUST take, and what is forbidden on it.
 | Black/white-point slider | cache-hit convert | same as tone slider | same |
 | Auto-levels button | async, generation-guarded | pica + `getImageData` allowed | dispatching tone changes after `autoLevelsGen` advances |
 | Auto-levels rerun on crop-region change | debounced (200 ms), generation-guarded | `notifyCropRegionChanged` → `autoLevels()` if `state.image.autoLevelsApplied` | running on the sync wheel/drag path; bypassing `autoLevelsGen` |
+| Crop resize handle drag (AR unlocked) | sync, sub-frame | direction-aware delta → `clampCropBox` → `setBoxSize`/`setBoxPosition` → `applyCropBoxToDom`, `requestConvert` (rAF) | source-canvas redraw, pica, anything O(sourceW×sourceH) on the move loop |
 | Mode change (crop ↔ fit) | full rebuild | `resetEditor` → full applyGeometry + raster rebuild | — |
 | Rotation / mirror | full rebuild | rebuilds `rotatedSrc` + `resetEditor` | — |
 | Device change | full rebuild | resizes output canvases + `resetEditor` | — |
@@ -393,7 +396,7 @@ Lessons from past changes, stated as bans:
 
 - **Don't `addEventListener` from `features/`.** Wire callbacks through `ui/cropInteraction.ts` (or another `ui/` module) and pass them via deps. The wheel-zoom handler used to live under `features/`; it was moved into `ui/cropInteraction.ts`, and the bridge that adapts store/runtime to it lives in `ui/imageCropBridge.ts`.
 - **Don't import from `ui/` inside `features/`.** Feature controllers must not type against `AppDom` or pull from `ui/*`. Take individual element refs through deps (see `ImageControllerElements` / `GbControllerElements`).
-- **Don't write to `runtime.displayScale` / `workScale` / `dispImg{W,H}` / `box{X,Y,W,H}` outside `applyGeometry`** (drag handlers may move boxX/boxY through `setBoxPosition` → `applyCropBoxToDom`, which is also fine since those are the box's only writer pair).
+- **Don't write to `runtime.displayScale` / `workScale` / `dispImg{W,H}` / `box{X,Y,W,H}` outside `applyGeometry`** (drag handlers may move boxX/boxY via `setBoxPosition`; aspect-ratio-unlocked resize handlers may move boxW/boxH via `setBoxSize`. Both go through `applyCropBoxToDom` after.)
 - **Don't reintroduce pica into the source preview redraw.** `redrawSourceCanvas` uses native `drawImage` with `imageSmoothingQuality='high'`. Pica there is what made wheel zoom feel laggy; the output pipeline still uses pica via `renderImageBaseRaster`.
 - **Don't bypass `rasterDirty`.** The SharedArrayBuffer copy is the dominant per-convert cost. Sliders that don't change the raster must keep `rasterDirty=false`.
 - **Don't dispatch `imageSetEditorZoom` directly from UI.** Go through `applyEditorZoom` (clamps to `maxZoom`, anchors scroll, runs `applyGeometry`) or `setZoom` (which calls `resetEditor`).

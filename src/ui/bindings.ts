@@ -14,6 +14,7 @@ type BindingDeps = {
   scheduleConvert: () => void;
   autoLevels: () => void | Promise<void>;
   invalidateBaseRaster: () => void;
+  notifyAspectRatioLockChanged: () => void;
 };
 
 export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
@@ -32,6 +33,11 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
   dom.ditherToggle.addEventListener('change', () => {
     store.dispatch(actions.imageSetDitherEnabled(dom.ditherToggle.checked));
     scheduleConvert();
+  });
+
+  dom.aspectRatioLockToggle.addEventListener('change', () => {
+    store.dispatch(actions.imageSetAspectRatioLocked(dom.aspectRatioLockToggle.checked));
+    deps.notifyAspectRatioLockChanged();
   });
 
   dom.contrastSlider.addEventListener('input', () => {

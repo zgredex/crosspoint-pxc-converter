@@ -68,6 +68,12 @@ export function setBoxPosition(runtime: ImageRuntime, x: number, y: number): voi
   mutable.boxY = y;
 }
 
+export function setBoxSize(runtime: ImageRuntime, w: number, h: number): void {
+  const mutable = asMutableRuntime(runtime);
+  mutable.boxW = w;
+  mutable.boxH = h;
+}
+
 export function commitBaseRaster(runtime: ImageRuntime, raster: Uint8ClampedArray): void {
   asMutableRuntime(runtime).cachedBaseRaster = raster;
 }

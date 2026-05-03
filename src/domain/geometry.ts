@@ -1,20 +1,15 @@
 export type FitAlign = 'tl' | 'tc' | 'tr' | 'ml' | 'mc' | 'mr' | 'bl' | 'bc' | 'br';
 
-export type ImageRenderPlan =
-  | {
-      kind: 'fit';
-      fittedWidth: number;
-      fittedHeight: number;
-      offsetX: number;
-      offsetY: number;
-    }
-  | {
-      kind: 'crop';
-      srcX: number;
-      srcY: number;
-      cropW: number;
-      cropH: number;
-    };
+export type ImageRenderPlan = {
+  srcX: number;
+  srcY: number;
+  srcW: number;
+  srcH: number;
+  fittedWidth: number;
+  fittedHeight: number;
+  offsetX: number;
+  offsetY: number;
+};
 
 export type ImageAnalysisRegion = {
   x: number;
@@ -66,6 +61,33 @@ export function fitOffset(fw: number, fh: number, targetW: number, targetH: numb
   return { x, y };
 }
 
+// Clamp a candidate crop box (in source pixels) to satisfy:
+//   - source bounds: 1 ≤ srcW ≤ sourceW, 1 ≤ srcH ≤ sourceH
+//   - no upscale: min(targetW/srcW, targetH/srcH) ≤ 1, i.e. srcW ≥ targetW OR srcH ≥ targetH
+// `driving` says which axis the user is actively changing — when the candidate
+// violates no-upscale, the *other* axis is forced to its target minimum.
+export function clampCropBox(params: {
+  srcW: number;
+  srcH: number;
+  sourceW: number;
+  sourceH: number;
+  targetW: number;
+  targetH: number;
+  driving: 'w' | 'h' | 'both';
+}): { srcW: number; srcH: number } {
+  let srcW = Math.max(1, Math.min(params.sourceW, Math.round(params.srcW)));
+  let srcH = Math.max(1, Math.min(params.sourceH, Math.round(params.srcH)));
+  const minTW = Math.min(params.targetW, params.sourceW);
+  const minTH = Math.min(params.targetH, params.sourceH);
+
+  if (srcW < minTW && srcH < minTH) {
+    if (params.driving === 'w') srcW = minTW;
+    else if (params.driving === 'h') srcH = minTH;
+    else { srcW = minTW; srcH = minTH; }
+  }
+  return { srcW, srcH };
+}
+
 export function buildImageRenderPlan(params: {
   mode: 'crop' | 'fit';
   sourceW: number;
@@ -74,18 +96,21 @@ export function buildImageRenderPlan(params: {
   targetH: number;
   fitAlign: FitAlign;
   displayScale: number;
-  workScale: number;
   boxX: number;
   boxY: number;
+  boxW: number;
+  boxH: number;
 }): ImageRenderPlan {
   if (params.mode === 'fit') {
     const fitScale = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
     const fittedWidth = Math.max(1, Math.round(params.sourceW * fitScale));
     const fittedHeight = Math.max(1, Math.round(params.sourceH * fitScale));
     const offset = fitOffset(fittedWidth, fittedHeight, params.targetW, params.targetH, params.fitAlign);
-
     return {
-      kind: 'fit',
+      srcX: 0,
+      srcY: 0,
+      srcW: params.sourceW,
+      srcH: params.sourceH,
       fittedWidth,
       fittedHeight,
       offsetX: offset.x,
@@ -95,38 +120,31 @@ export function buildImageRenderPlan(params: {
 
   const srcX = Math.max(0, Math.round(params.boxX / params.displayScale));
   const srcY = Math.max(0, Math.round(params.boxY / params.displayScale));
-  const cropW = Math.max(1, Math.min(params.sourceW - srcX, Math.round(params.targetW / params.workScale)));
-  const cropH = Math.max(1, Math.min(params.sourceH - srcY, Math.round(params.targetH / params.workScale)));
+  const srcW = Math.max(1, Math.min(params.sourceW - srcX, Math.round(params.boxW / params.displayScale)));
+  const srcH = Math.max(1, Math.min(params.sourceH - srcY, Math.round(params.boxH / params.displayScale)));
+  const cropFitScale = Math.min(params.targetW / srcW, params.targetH / srcH);
+  const fittedWidth = Math.max(1, Math.round(srcW * cropFitScale));
+  const fittedHeight = Math.max(1, Math.round(srcH * cropFitScale));
+  const offset = fitOffset(fittedWidth, fittedHeight, params.targetW, params.targetH, params.fitAlign);
 
   return {
-    kind: 'crop',
     srcX,
     srcY,
-    cropW,
-    cropH,
+    srcW,
+    srcH,
+    fittedWidth,
+    fittedHeight,
+    offsetX: offset.x,
+    offsetY: offset.y,
   };
 }
 
-export function getImageAnalysisRegion(
-  plan: ImageRenderPlan,
-  targetW: number,
-  targetH: number,
-): ImageAnalysisRegion {
-  if (plan.kind === 'fit') {
-    return {
-      x: Math.round(plan.offsetX),
-      y: Math.round(plan.offsetY),
-      width: plan.fittedWidth,
-      height: plan.fittedHeight,
-      pixelCount: plan.fittedWidth * plan.fittedHeight,
-    };
-  }
-
+export function getImageAnalysisRegion(plan: ImageRenderPlan): ImageAnalysisRegion {
   return {
-    x: 0,
-    y: 0,
-    width: targetW,
-    height: targetH,
-    pixelCount: targetW * targetH,
+    x: Math.round(plan.offsetX),
+    y: Math.round(plan.offsetY),
+    width: plan.fittedWidth,
+    height: plan.fittedHeight,
+    pixelCount: plan.fittedWidth * plan.fittedHeight,
   };
 }

@@ -26,6 +26,7 @@ export type AppAction =
   | { type: 'image/setEditorZoom'; editorZoom: number }
   | { type: 'image/setEditorMaxZoom'; editorMaxZoom: number }
   | { type: 'image/setSourceDims'; dims: ImageDims | null }
+  | { type: 'image/setAspectRatioLocked'; locked: boolean }
   | { type: 'image/resetAll' }
   | { type: 'gb/setPalette'; paletteKey: GbPaletteKey }
   | { type: 'gb/setInvert'; invert: boolean }
@@ -68,6 +69,7 @@ export const actions = {
   imageSetEditorZoom: (editorZoom: number): AppAction => ({ type: 'image/setEditorZoom', editorZoom }),
   imageSetEditorMaxZoom: (editorMaxZoom: number): AppAction => ({ type: 'image/setEditorMaxZoom', editorMaxZoom }),
   imageSetSourceDims: (dims: ImageDims | null): AppAction => ({ type: 'image/setSourceDims', dims }),
+  imageSetAspectRatioLocked: (locked: boolean): AppAction => ({ type: 'image/setAspectRatioLocked', locked }),
   imageResetAll: (): AppAction => ({ type: 'image/resetAll' }),
   gbSetPalette: (paletteKey: GbPaletteKey): AppAction => ({ type: 'gb/setPalette', paletteKey }),
   gbSetInvert: (invert: boolean): AppAction => ({ type: 'gb/setInvert', invert }),

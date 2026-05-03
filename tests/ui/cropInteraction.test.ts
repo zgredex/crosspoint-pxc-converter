@@ -41,7 +41,12 @@ function mouseEvent(x: number, y: number, preventDefault?: () => void): MouseEve
     clientX: x,
     clientY: y,
     preventDefault: preventDefault ?? vi.fn(),
+    stopPropagation: vi.fn(),
   } as unknown as MouseEvent;
+}
+
+function defaultBoxStateExtras() {
+  return { displayScale: 1, sourceW: 1000, sourceH: 1000, targetW: 480, targetH: 800 };
 }
 
 describe('setupCropInteraction', () => {
@@ -78,12 +83,14 @@ describe('setupCropInteraction', () => {
       boxH: 80,
       boxX: 40,
       boxY: 30,
+      ...defaultBoxStateExtras(),
     };
     const applyCropBox = vi.fn();
     const nudgeCropBoxIntoView = vi.fn();
 
     setupCropInteraction({
       cropBox,
+      cropHandles: [],
       sourceCanvas,
       sourceFrame,
       snapGuideH,
@@ -94,11 +101,13 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
+      getAspectRatioLocked: () => true,
       getBoxState: () => boxState,
       setBoxPosition: (x, y) => {
         boxState.boxX = x;
         boxState.boxY = y;
       },
+      setBoxSize: vi.fn(),
       applyCropBox,
       nudgeCropBoxIntoView,
       scheduleConvert: vi.fn(),
@@ -141,6 +150,7 @@ describe('setupCropInteraction', () => {
 
     setupCropInteraction({
       cropBox,
+      cropHandles: [],
       sourceCanvas,
       sourceFrame,
       snapGuideH,
@@ -151,6 +161,7 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
+      getAspectRatioLocked: () => true,
       getBoxState: () => ({
         dispImgW: 500,
         dispImgH: 400,
@@ -158,8 +169,10 @@ describe('setupCropInteraction', () => {
         boxH: 80,
         boxX: 0,
         boxY: 0,
+        ...defaultBoxStateExtras(),
       }),
       setBoxPosition: vi.fn(),
+      setBoxSize: vi.fn(),
       applyCropBox: vi.fn(),
       nudgeCropBoxIntoView,
       scheduleConvert: vi.fn(),
@@ -195,6 +208,7 @@ describe('setupCropInteraction', () => {
 
     setupCropInteraction({
       cropBox,
+      cropHandles: [],
       sourceCanvas,
       sourceFrame,
       snapGuideH,
@@ -205,6 +219,7 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
+      getAspectRatioLocked: () => true,
       getBoxState: () => ({
         dispImgW: 500,
         dispImgH: 400,
@@ -212,8 +227,10 @@ describe('setupCropInteraction', () => {
         boxH: 80,
         boxX: 0,
         boxY: 0,
+        ...defaultBoxStateExtras(),
       }),
       setBoxPosition: vi.fn(),
+      setBoxSize: vi.fn(),
       applyCropBox: vi.fn(),
       nudgeCropBoxIntoView: vi.fn(),
       scheduleConvert: vi.fn(),
@@ -264,6 +281,7 @@ describe('setupCropInteraction', () => {
 
     setupCropInteraction({
       cropBox,
+      cropHandles: [],
       sourceCanvas,
       sourceFrame,
       snapGuideH,
@@ -274,6 +292,7 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
+      getAspectRatioLocked: () => true,
       getBoxState: () => ({
         dispImgW: 500,
         dispImgH: 400,
@@ -281,8 +300,10 @@ describe('setupCropInteraction', () => {
         boxH: 80,
         boxX: 0,
         boxY: 0,
+        ...defaultBoxStateExtras(),
       }),
       setBoxPosition: vi.fn(),
+      setBoxSize: vi.fn(),
       applyCropBox: vi.fn(),
       nudgeCropBoxIntoView: vi.fn(),
       scheduleConvert: vi.fn(),

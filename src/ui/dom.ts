@@ -43,6 +43,8 @@ export function createDom() {
     mirrorVBtn: requiredElement<HTMLButtonElement>('mirrorVBtn'),
     invertToggle: requiredElement<HTMLInputElement>('invertToggle'),
     ditherToggle: requiredElement<HTMLInputElement>('ditherToggle'),
+    aspectRatioLockToggle: requiredElement<HTMLInputElement>('aspectRatioLockToggle'),
+    cropHandles: queryAll<HTMLDivElement>('#cropBox .crop-handle'),
     ditherAlgos: requiredElement<HTMLDivElement>('ditherAlgos'),
     previewCanvas: requiredElement<HTMLCanvasElement>('previewCanvas'),
     workCanvas: requiredElement<HTMLCanvasElement>('workCanvas'),

@@ -48,13 +48,16 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   setActive(dom.bgButtons, button => button.dataset.bg === state.background);
   setActive(dom.gbPaletteButtons, button => button.dataset.gbpalette === state.gb.paletteKey);
 
-  dom.posSection.classList.toggle('disabled', state.image.mode === 'crop');
+  const positionGridUsable = state.image.mode === 'fit' || (state.image.mode === 'crop' && !state.image.aspectRatioLocked);
+  dom.posSection.classList.toggle('disabled', !positionGridUsable);
   dom.mirrorHBtn.classList.toggle('active', state.image.mirrorH);
   dom.mirrorVBtn.classList.toggle('active', state.image.mirrorV);
   dom.autoLevelsBtn.classList.toggle('active', state.image.autoLevelsApplied);
 
   dom.invertToggle.checked = state.image.invert;
   dom.ditherToggle.checked = state.image.ditherEnabled;
+  dom.aspectRatioLockToggle.checked = state.image.aspectRatioLocked;
+  dom.cropBox.classList.toggle('unlocked', state.image.mode === 'crop' && !state.image.aspectRatioLocked);
   dom.ditherAlgos.classList.toggle('disabled', !state.image.ditherEnabled);
   for (const button of dom.ditherButtons) button.disabled = !state.image.ditherEnabled;
 

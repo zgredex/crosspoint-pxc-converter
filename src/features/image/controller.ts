@@ -17,6 +17,7 @@ import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import type { PicaResizer } from '../../infra/canvas/picaResize';
 import {
   buildImageRenderPlan,
+  clampCropBox,
   computeEditorGeometry,
   getImageAnalysisRegion,
   type EditorGeometry,
@@ -38,6 +39,7 @@ export type ImageController = {
   resetEditor(): Promise<void>;
   autoLevels(): Promise<void>;
   notifyCropRegionChanged(): void;
+  notifyAspectRatioLockChanged(): void;
   requestConvert(): void;
   invalidateBaseRaster(): void;
   refreshTransformedSource(): Promise<void>;
@@ -100,9 +102,10 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       targetH: state.device.targetH,
       fitAlign: state.image.fitAlign,
       displayScale: deps.runtime.displayScale,
-      workScale: deps.runtime.workScale,
       boxX: deps.runtime.boxX,
       boxY: deps.runtime.boxY,
+      boxW: deps.runtime.boxW,
+      boxH: deps.runtime.boxH,
     });
   }
 
@@ -292,8 +295,27 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       ? sourceH / 2
       : (deps.runtime.boxY + deps.runtime.boxH / 2) / oldDisplay;
 
-    const boxW = Math.min((state.device.targetW / geom.workScale) * geom.displayScale, geom.dispImgW);
-    const boxH = Math.min((state.device.targetH / geom.workScale) * geom.displayScale, geom.dispImgH);
+    const lockedBoxW = Math.min((state.device.targetW / geom.workScale) * geom.displayScale, geom.dispImgW);
+    const lockedBoxH = Math.min((state.device.targetH / geom.workScale) * geom.displayScale, geom.dispImgH);
+    let boxW = lockedBoxW;
+    let boxH = lockedBoxH;
+    if (!state.image.aspectRatioLocked) {
+      const prevBoxSrcW = oldDisplay > 0 ? deps.runtime.boxW / oldDisplay : 0;
+      const prevBoxSrcH = oldDisplay > 0 ? deps.runtime.boxH / oldDisplay : 0;
+      if (prevBoxSrcW > 0 && prevBoxSrcH > 0) {
+        const clamped = clampCropBox({
+          srcW: prevBoxSrcW,
+          srcH: prevBoxSrcH,
+          sourceW,
+          sourceH,
+          targetW: state.device.targetW,
+          targetH: state.device.targetH,
+          driving: 'both',
+        });
+        boxW = clamped.srcW * geom.displayScale;
+        boxH = clamped.srcH * geom.displayScale;
+      }
+    }
     commitGeometry(deps.runtime, {
       displayScale: geom.displayScale,
       workScale: geom.workScale,
@@ -392,7 +414,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     });
     if (gen !== deps.runtime.autoLevelsGen || !isCurrentSession(sessionVersion)) return;
 
-    const region = getImageAnalysisRegion(plan, state.device.targetW, state.device.targetH);
+    const region = getImageAnalysisRegion(plan);
     const px = getContext2d(tempCanvas).getImageData(region.x, region.y, region.width, region.height).data;
     const levels = computeAutoLevels(buildUintHistogram(buildLuminanceBuffer(px)), region.pixelCount);
 
@@ -477,12 +499,20 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     rasterDirty = true;
   }
 
+  function notifyAspectRatioLockChanged(): void {
+    if (!deps.runtime.loadedImg) return;
+    rasterDirty = true;
+    void resetEditor(false);
+    notifyCropRegionChanged();
+  }
+
   return {
     loadImageFile,
     unloadImage,
     resetEditor,
     autoLevels,
     notifyCropRegionChanged,
+    notifyAspectRatioLockChanged,
     requestConvert,
     invalidateBaseRaster,
     refreshTransformedSource,

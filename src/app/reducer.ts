@@ -80,6 +80,8 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
       return { ...state, image: { ...state.image, editorMaxZoom: action.editorMaxZoom } };
     case 'image/setSourceDims':
       return { ...state, image: { ...state.image, sourceDims: action.dims } };
+    case 'image/setAspectRatioLocked':
+      return { ...state, image: { ...state.image, aspectRatioLocked: action.locked } };
     case 'image/resetAll':
       return { ...state, image: initialImageState };
     case 'gb/setPalette':

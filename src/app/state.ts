@@ -57,6 +57,7 @@ export type ImageState = {
   editorZoom: number;
   editorMaxZoom: number;
   sourceDims: ImageDims | null;
+  aspectRatioLocked: boolean;
 };
 
 export type GbState = {
@@ -109,6 +110,7 @@ export const initialImageState: ImageState = {
   editorZoom: 1.0,
   editorMaxZoom: 1.0,
   sourceDims: null,
+  aspectRatioLocked: true,
 };
 
 export const initialGbState: GbState = {
