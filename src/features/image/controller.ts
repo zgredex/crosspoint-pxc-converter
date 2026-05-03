@@ -136,6 +136,18 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (processRequested) scheduleNextConvert();
   });
 
+  // Worker-side errors must reset the single-flight gate; otherwise `processing` stays true and
+  // every subsequent slider tweak only sets `processRequested`, locking the convert pipeline.
+  deps.worker.onError((error) => {
+    // Stale failures (from a superseded version or an old session) are already irrelevant; ignore.
+    if (error.version !== -1 && error.version !== deps.runtime.processVersion) return;
+    if (inFlightProcessSession !== null && !isCurrentSession(inFlightProcessSession)) return;
+    processing = false;
+    inFlightProcessSession = null;
+    deps.host.showError(`Image worker failed (${error.phase}): ${error.message}`);
+    if (processRequested) scheduleNextConvert();
+  });
+
   function requestConvert(): void {
     if (deps.runtime.convertTimer !== null) cancelAnimationFrame(deps.runtime.convertTimer);
     processRequested = true;

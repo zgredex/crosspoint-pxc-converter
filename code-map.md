@@ -42,6 +42,8 @@ domain  ←  infra  ←  app  ←  features  ←  ui
 
 **Wiring exception:** `app/bootstrap.ts`, `app/appController.ts`, and `app/loaderRouter.ts` may import feature factories/types to compose the runtime graph — they are the wiring layer, sitting *above* features for composition while still owning the store/runtime contract. The "app must not import from features" reading of the chain applies to non-wiring app modules (`store`, `reducer`, `state`, `actions`, `messages`, `validation`, `sessionReset`, `runtime/*`).
 
+**Enforcement.** The chain is enforced by `dependency-cruiser` (config: `.dependency-cruiser.cjs`). It runs as part of `npm run build` and as a standalone `npm run depcheck`. The same wiring exception is encoded as a `pathNot` on the `app-no-features-ui` rule. Add a violation, the build fails — don't downgrade a rule to "warn" to silence it; either fix the import or move the file to the right layer.
+
 ---
 
 ## 3. Single-source rules (no duplication)
@@ -127,6 +129,13 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 - **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Drag handlers may move `boxX/boxY` through `setBoxPosition` and resize handlers may move `boxW/boxH` through `setBoxSize` — those are the only other writers, and both are scoped to crop-interaction gestures. Don't write to these fields anywhere else.
 - **`runtime.cachedBaseRaster` / `sharedBufferVersion`** are written only by `convert` (image controller). Cleared by `unloadImage`. Invalidated for next `convert` (forces a pica rebuild) only via `invalidateBaseRaster()` — currently called from `ui/bindings.ts` (fit-position change) and `appController.handleBackgroundChange`.
 - **`output.{pxcBytes,bmpBytes}`** are written only via `setOutputBytes` / `clearOutputBytes` from `outputRuntime.ts` — and only by the GB controller (the image path encodes lazily on download).
+
+### Store conventions
+
+- **Action naming.** `<feature>Set<Field>` for value setters (`imageSetBlackPoint`, `gbSetPalette`), `<feature>Toggle<Field>` for booleans (`imageToggleAspectRatioLock`), `<feature>Reset<Scope>` for grouped resets. Top-level state slices (`device`, `output`, `ui`) follow the same rule with their slice name as prefix.
+- **Reducer is pure.** No `dispatch`, no `fetch`/promises, no timers. Validation/clamping inside cases is fine (e.g., black-point clamp). Anything that touches the runtime (canvases, workers, IO, rAF) lives in a controller, never in the reducer.
+- **No selectors in the reducer.** Computed-from-state values (e.g., display labels, derived geometry) are computed in feature controllers or in `ui/render.ts`. The reducer's job is to apply the action and return new state.
+- **Single writer per runtime field.** Section 5 above lists each runtime field and its sole writer; preserve that invariant when adding new mutable state.
 
 ---
 
@@ -299,6 +308,14 @@ Three monotonically-increasing counters guard async paths.
 - **`autoLevelsGen`** (`runtime.autoLevelsGen`) — incremented per `autoLevels()` call. The async pica + getImageData chain checks `gen !== runtime.autoLevelsGen` after each `await` to abort when superseded.
 - **`convertTimer`** (`runtime.convertTimer`) — the rAF id of the in-flight convert schedule. `requestConvert` cancels and re-schedules.
 - **`processing` / `processRequested`** — single-flight gate around the worker. While `processing`, additional `requestConvert` calls only set `processRequested`; on result, if `processRequested`, schedule the next convert.
+
+### Worker contract (`infra/worker/imageWorker*`)
+
+- **Cancellation** is implicit: bump `processVersion`, send a fresh `process` message; the result handler discards anything whose echoed `version` doesn't match. There is no explicit "abort" message — the worker always finishes the in-flight job and the host throws the result away.
+- **Buffer replacement.** Send a new SAB via `setBaseRaster` (host increments `sharedBufferVersion`); the worker rebinds to the latest buffer. The previous buffer is GC'd once no in-flight job references it.
+- **Errors flow back as a typed message.** `WorkerOutMessage` has an `error` variant (`{ phase: 'set-base-raster' | 'process'; version; message }`). The worker wraps both branches of `processMessage` in `try/catch` and posts an `error` instead of swallowing the throw. The host registers `worker.onError` (in `features/image/controller.ts`); the handler resets `processing = false`, drops `inFlightProcessSession`, surfaces via `host.showError`, and re-pumps if `processRequested`. Stale errors (mismatched `version`) are ignored. Without this contract a worker throw would lock the convert pipeline because `processing` would never clear.
+- **Unexpected crashes** (parse errors, OOM, unhandled rejections that bypass our `try/catch`) come through the worker's own `error` event and are routed into the same `onError` channel with `version: -1` so the gate still resets.
+- **Teardown.** `client.terminate()` sets a `terminated` flag, nulls both callbacks, and calls `worker.terminate()`. Late-arriving messages from a torn-down worker are gated by the flag and dropped before reaching the host.
 
 ---
 

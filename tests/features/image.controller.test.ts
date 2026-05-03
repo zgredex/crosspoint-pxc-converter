@@ -52,15 +52,22 @@ vi.mock('../../src/infra/canvas/context', () => ({
 
 function createMockWorker() {
   let resultHandler: ((result: Extract<WorkerOutMessage, { type: 'result' }>) => void) | null = null;
+  let errorHandler: ((error: Extract<WorkerOutMessage, { type: 'error' }>) => void) | null = null;
   return {
     setBaseRaster: vi.fn(),
     process: vi.fn(),
     onResult: vi.fn((callback: (result: Extract<WorkerOutMessage, { type: 'result' }>) => void) => {
       resultHandler = callback;
     }),
+    onError: vi.fn((callback: (error: Extract<WorkerOutMessage, { type: 'error' }>) => void) => {
+      errorHandler = callback;
+    }),
     terminate: vi.fn(),
     emitResult(result: Extract<WorkerOutMessage, { type: 'result' }>) {
       resultHandler?.(result);
+    },
+    emitError(error: Extract<WorkerOutMessage, { type: 'error' }>) {
+      errorHandler?.(error);
     },
   };
 }
@@ -411,5 +418,39 @@ describe('image controller', () => {
     expect(runtime.loadedImg).toBeNull();
 
     vi.unstubAllGlobals();
+  });
+
+  it('surfaces worker errors via showError for the in-flight version', () => {
+    const worker = createMockWorker();
+    const store = createMockStore({
+      ...initialAppState,
+      loadedType: 'image',
+    });
+    const runtime = createImageRuntime();
+    runtime.processVersion = 7;
+    const showError = vi.fn();
+
+    createImageController({
+      store,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker,
+      host: {
+        clearStatus: vi.fn(),
+        showError,
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
+      clearSnap: vi.fn(),
+    });
+
+    worker.emitError({ type: 'error', phase: 'process', version: 7, message: 'boom' });
+    expect(showError).toHaveBeenCalledWith(expect.stringContaining('boom'));
+
+    showError.mockClear();
+    worker.emitError({ type: 'error', phase: 'process', version: 1, message: 'stale' });
+    expect(showError).not.toHaveBeenCalled();
   });
 });

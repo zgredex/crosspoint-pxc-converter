@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && depcruise --config .dependency-cruiser.cjs --output-type err src && vite build",
+    "depcheck": "depcruise --config .dependency-cruiser.cjs --output-type err src",
     "test": "vitest run --passWithNoTests",
     "gen:blue-noise": "tsx scripts/gen-blue-noise.ts"
   },
@@ -13,6 +14,7 @@
     "pica": "^9.0.1"
   },
   "devDependencies": {
+    "dependency-cruiser": "^17.4.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.10",
     "vitest": "^3.2.4"

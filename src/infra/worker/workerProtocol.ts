@@ -16,4 +16,5 @@ export type WorkerInMessage =
 
 export type WorkerOutMessage =
   | { type: 'ready' }
-  | { type: 'result'; indexedPixels: ArrayBuffer; histogram: ArrayBuffer; version: number };
+  | { type: 'result'; indexedPixels: ArrayBuffer; histogram: ArrayBuffer; version: number }
+  | { type: 'error'; phase: 'set-base-raster' | 'process'; version: number; message: string };
