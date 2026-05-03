@@ -191,15 +191,21 @@ The dither pipeline runs in a Web Worker over a `SharedArrayBuffer`. Browsers al
 
 ## Architecture
 
-The codebase is plain DOM plus a hand-rolled flux-style store, organised into a one-directional layer chain:
+The codebase is plain DOM plus a hand-rolled flux-style store, organised into a strict one-directional layer chain (each layer may only import from layers further left):
 
-- **`src/domain/`** — pure logic with no DOM: geometry, tone, dithering, histogram, format encoders, GB decoders.
+```
+domain  ←  infra  ←  app  ←  features  ←  ui
+```
+
+- **`src/domain/`** — pure logic with no DOM: geometry, tone, dithering, histogram, format encoders, GB decoders + helpers.
 - **`src/infra/`** — browser, canvas, worker, and file-IO adapters.
 - **`src/app/`** — store, reducer, runtime containers, top-level orchestration, loader routing, shared cleanup helpers.
-- **`src/features/{image,gb}/`** — feature controllers and helpers wired through deps.
+- **`src/features/{image,gb}/`** — feature controllers and helpers wired through deps; image and GB never import each other.
 - **`src/ui/`** — DOM lookup, store-driven render, event bindings, crop interaction, preview loupe.
 
-`code-map.md` carries the full architectural contract: layer rules, single-source-of-truth registry, fluidity hot paths, and runtime-object documentation. Read it before non-trivial changes.
+The dither / tone pipeline runs in a Web Worker over a `SharedArrayBuffer` (see [Hosting requirements](#hosting-requirements)). Three monotonic version counters (`processVersion`, `sharedBufferVersion`, `autoLevelsGen`) gate async results so a stale dither pass can't overwrite a fresh one.
+
+`code-map.md` carries the full architectural contract: layer rules, the single-source-of-truth registry that prevents parallel implementations, fluidity hot paths that must stay sub-frame, and runtime-object documentation. Read it before non-trivial changes.
 
 ---
 
