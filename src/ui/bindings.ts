@@ -5,7 +5,7 @@ import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
 import type { FitAlign } from '../domain/geometry';
-import type { FitBackground } from '../app/state';
+import { initialImageState, type FitBackground } from '../app/state';
 import type { AppDom } from './dom';
 
 type BindingDeps = {
@@ -46,6 +46,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
   });
 
   dom.contrastReset.addEventListener('click', () => {
+    if (store.getState().image.contrastValue === initialImageState.contrastValue) return;
     store.dispatch(actions.imageResetContrast());
     scheduleConvert();
   });
@@ -61,11 +62,21 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
   });
 
   dom.toneReset.addEventListener('click', () => {
+    const image = store.getState().image;
+    if (
+      image.blackPoint === initialImageState.blackPoint &&
+      image.whitePoint === initialImageState.whitePoint &&
+      image.gammaValue === initialImageState.gammaValue &&
+      !image.autoLevelsApplied
+    ) {
+      return;
+    }
     store.dispatch(actions.imageResetTone());
     scheduleConvert();
   });
 
   dom.autoLevelsBtn.addEventListener('click', () => {
+    if (store.getState().image.autoLevelsApplied) return;
     void autoLevels();
   });
 
@@ -80,6 +91,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const deviceKey = button.dataset.xt;
       if (!deviceKey) return;
+      if (store.getState().device.key === deviceKey) return;
       appController.setDevice(deviceKey as DeviceKey);
     });
   }
@@ -88,6 +100,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const mode = button.dataset.mode;
       if (!mode) return;
+      if (store.getState().image.mode === mode) return;
       appController.setImageMode(mode as 'crop' | 'fit');
     });
   }
@@ -96,6 +109,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const ditherMode = button.dataset.dither;
       if (!ditherMode) return;
+      if (store.getState().image.ditherMode === ditherMode) return;
       store.dispatch(actions.imageSetDitherMode(ditherMode as DitherMode));
       scheduleConvert();
     });
@@ -105,6 +119,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const fitAlign = button.dataset.pos;
       if (!fitAlign) return;
+      if (store.getState().image.fitAlign === fitAlign) return;
       store.dispatch(actions.imageSetFitAlign(fitAlign as FitAlign));
       deps.invalidateBaseRaster();
       scheduleConvert();
@@ -115,6 +130,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const background = button.dataset.bg;
       if (!background) return;
+      if (store.getState().background === background) return;
       appController.setBackground(background as FitBackground);
     });
   }
@@ -123,6 +139,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     button.addEventListener('click', () => {
       const paletteKey = button.dataset.gbpalette;
       if (!paletteKey) return;
+      if (store.getState().gb.paletteKey === paletteKey) return;
       appController.setGbPalette(paletteKey as GbPaletteKey);
     });
   }
