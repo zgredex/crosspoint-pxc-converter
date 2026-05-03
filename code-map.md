@@ -51,7 +51,7 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | Logic | Canonical home |
 | --- | --- |
 | Editor scale math (`displayScale`, `workScale`, `maxZoom`, clamped zoom, dispImg dims) | `domain/geometry.ts:computeEditorGeometry` |
-| Crop region / fit offsets in source-pixel coordinates | `domain/geometry.ts:buildImageRenderPlan` — single unified `ImageRenderPlan` shape (`srcX/Y/W/H` + `fittedWidth/Height` + `offsetX/Y`) covering fit, AR-locked crop, and AR-unlocked letterboxed crop. Used by convert AND autoLevels. |
+| Crop region / fit offsets in source-pixel coordinates | `domain/geometry.ts:buildImageRenderPlan` — single unified `ImageRenderPlan` shape (`srcX/Y/W/H` + `fittedWidth/Height` + `offsetX/Y`) covering fit, AR-locked crop, and AR-unlocked letterboxed crop. Used by convert AND autoLevels. **Takes `aspectRatioLocked`**: locked-AR crop returns `fittedWidth=targetW, fittedHeight=targetH, offsetX=offsetY=0` (fills the device); unlocked-AR crop snaps a 1-px-short fitted axis up to target to absorb rounding drift from `round(box ÷ displayScale)`. Real letterboxes are far larger than 1 px. |
 | Crop-box constraint clamp (no-upscale + source bound) | `domain/geometry.ts:clampCropBox` — driving-axis-aware. Called by `applyGeometry` (device/zoom changes) and `cropInteraction` handle drag. |
 | Image source rotation/mirroring | `features/image/source.ts:buildRotatedSource` + `getSourceImage` |
 | Source natural dimensions (display label) | `state.image.sourceDims` set by `features/image/controller.ts:loadImageFile` from `loadedImg.naturalWidth/Height`; GB side reuses `state.gb.dims` set by `features/gb/controller.ts:decodeGbDraw`. Rendered into `sourceLabel` by `ui/render.ts`. |
@@ -410,6 +410,8 @@ Lessons from past changes, stated as bans:
 - **Don't add per-pixel branches in tone math.** Bake everything into the LUT (commit `954638b`).
 - **Don't mutate state outside the reducer.** The store is the only writer.
 - **Don't rasterize bigger than needed.** `stepDownscaleAndResize` halves until the source is within 2× the target, then pica-resizes once. Skipping that path causes visible quality loss on very large sources.
+- **Don't trust `round(srcW × cropFitScale)` to land on `targetW`.** `srcW`/`srcH` are themselves rounded from `box ÷ displayScale`, so the source AR drifts off device AR by a sub-pixel and the loser axis lands 1 px short of target — drawing a 1-px fit-bg sliver at the rim. `buildImageRenderPlan` handles this in two places: the locked-AR branch returns target-sized fitted dims directly; the unlocked branch snaps a `target - rawFitted === 1` deficit up to target. Real letterboxes are dozens of pixels — preserve that distinction if you ever rework this.
+- **Don't pass non-integer offsets to `drawImage` for the output composite.** `fitOffset` rounds the centered branches because sub-pixel `drawImage` blends the resized canvas's rim with the underlying `fillRect` background, producing a faint colored line at the preview edge. Side-pinned offsets (`l/r/t/b`) are already integer.
 
 ---
 
