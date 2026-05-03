@@ -8,6 +8,7 @@ import type { ImageRuntime } from './runtime/imageRuntime';
 import type { FitBackground } from './state';
 import { encodePxc } from '../domain/formats/pxc';
 import { encodeGrayBmp } from '../domain/formats/bmpGray';
+import { DITHER_FILENAME_SUFFIX } from '../domain/dither';
 
 import type { DeviceKey } from '../domain/devices';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
@@ -170,7 +171,11 @@ export function createAppController(deps: AppControllerDeps): AppController {
     mime: string,
   ): void {
     const state = deps.store.getState();
-    const filename = `${state.output.baseName}.${ext}`;
+    const suffix =
+      state.loadedType === 'image' && state.image.ditherEnabled
+        ? `-${DITHER_FILENAME_SUFFIX[state.image.ditherMode]}`
+        : '';
+    const filename = `${state.output.baseName}${suffix}.${ext}`;
     if (state.loadedType === 'image') {
       const px = deps.imageRuntime.lastIndexedPixels;
       if (!px) return;

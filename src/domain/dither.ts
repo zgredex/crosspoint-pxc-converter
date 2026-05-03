@@ -3,6 +3,17 @@ import { BLUE_NOISE_64 } from './blueNoise';
 
 export type DitherMode = 'fs' | 'atk' | 'jjn' | 'stucki' | 'burkes' | 'bayer' | 'zhou-fang' | 'blue-noise';
 
+export const DITHER_FILENAME_SUFFIX: Record<DitherMode, string> = {
+  fs: 'fs',
+  atk: 'atk',
+  jjn: 'jjn',
+  stucki: 'stk',
+  burkes: 'bks',
+  bayer: 'bay',
+  'zhou-fang': 'zf',
+  'blue-noise': 'bn',
+};
+
 // Zhou & Fang, "Improving mid-tone quality of variable-coefficient error
 // diffusion using threshold modulation", SIGGRAPH 2003. Per-intensity FS-style
 // kernel coefficients (right, below-left, below) plus an asymmetric threshold
