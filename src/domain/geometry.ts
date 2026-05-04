@@ -29,7 +29,7 @@ export type EditorGeometry = {
 };
 
 export function computeEditorGeometry(params: {
-  mode: 'crop' | 'fit' | 'one-to-one';
+  mode: 'crop' | 'fit';
   sourceW: number;
   sourceH: number;
   targetW: number;
@@ -42,7 +42,7 @@ export function computeEditorGeometry(params: {
   const baseCropScale = Math.max(params.targetW / params.sourceW, params.targetH / params.sourceH);
   const fitScale = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
   // Crop maxZoom: zoom until the source pixel-grid fills the device on the larger axis.
-  // Fit / 1:1 maxZoom: zoom until 1 source pixel = 1 screen pixel (displayScale = 1).
+  // Fit (incl. fit-locked-native) maxZoom: zoom until 1 source pixel = 1 screen pixel (displayScale = 1).
   const maxZoom = params.mode === 'crop'
     ? Math.max(1, 1 / baseCropScale)
     : Math.max(1, 1 / baseDisplayScale);
@@ -116,8 +116,22 @@ export function clampBoxToDevice(params: {
   return { srcW, srcH };
 }
 
+// Mode-aware box clamp dispatcher: routes to the single-invariant clamp helper for the active
+// configuration. `fitLockNative=true` requires the box to fit inside the device (no resample
+// allowed); fit-with-free-scale uses the source-bound clamp. Crop mode bypasses both — its box
+// is fully recomputed from device AR in `applyGeometry`.
+export function clampBoxForMode(
+  mode: 'crop' | 'fit',
+  fitLockNative: boolean,
+  params: { srcW: number; srcH: number; sourceW: number; sourceH: number; targetW: number; targetH: number },
+): { srcW: number; srcH: number } {
+  if (mode === 'fit' && fitLockNative) return clampBoxToDevice(params);
+  // 'crop' mode never reaches here in practice — its box is recomputed, not preserved across changes.
+  return clampBoxToSource(params);
+}
+
 export function buildImageRenderPlan(params: {
-  mode: 'crop' | 'fit' | 'one-to-one';
+  mode: 'crop' | 'fit';
   sourceW: number;
   sourceH: number;
   targetW: number;
@@ -130,6 +144,7 @@ export function buildImageRenderPlan(params: {
   boxH: number;
   fitSizePct: number;
   fitNoUpscale: boolean;
+  fitLockNative: boolean;
 }): ImageRenderPlan {
   const srcX = Math.max(0, Math.round(params.boxX / params.displayScale));
   const srcY = Math.max(0, Math.round(params.boxY / params.displayScale));
@@ -137,27 +152,30 @@ export function buildImageRenderPlan(params: {
   const srcH = Math.max(1, Math.min(params.sourceH - srcY, Math.round(params.boxH / params.displayScale)));
 
   if (params.mode === 'fit') {
-    const factor = Math.max(0.01, Math.min(1, params.fitSizePct / 100));
+    // Contain branch — covers both regular fit and fit-locked-native (1:1).
+    // - fitLockNative: scale forced to 1; box clamp upstream guarantees srcW ≤ targetW, srcH ≤ targetH,
+    //   so fittedW=srcW lands ≤ device and fitOffset is ≥ 0 (no clipping).
+    // - regular fit: scale = baseScale × (fitSizePct/100), with optional no-upscale cap and a 1-px
+    //   snap-up at full fit to absorb rounding drift from box-÷-displayScale.
     const baseScale = Math.min(params.targetW / srcW, params.targetH / srcH);
-    let scale = baseScale * factor;
-    // No-upscale guard: small sources stay at native resolution rather than being resampled larger.
-    if (params.fitNoUpscale && scale > 1) scale = 1;
+    let scale: number;
+    if (params.fitLockNative) {
+      scale = 1;
+    } else {
+      const factor = Math.max(0.01, Math.min(1, params.fitSizePct / 100));
+      scale = baseScale * factor;
+      if (params.fitNoUpscale && scale > 1) scale = 1;
+    }
     let fittedWidth = Math.max(1, Math.round(srcW * scale));
     let fittedHeight = Math.max(1, Math.round(srcH * scale));
-    // 1-px snap-up applies only at full fit; sub-fit factors are deliberate undersize.
-    if (factor === 1 && scale === baseScale) {
+    // 1-px snap-up applies only at full fit; sub-fit factors are deliberate undersize. Skipped under
+    // fitLockNative because fittedW=srcW exactly there (no rounding drift to snap).
+    if (!params.fitLockNative && scale === baseScale) {
       if (params.targetW - fittedWidth === 1) fittedWidth = params.targetW;
       if (params.targetH - fittedHeight === 1) fittedHeight = params.targetH;
     }
     const offset = fitOffset(fittedWidth, fittedHeight, params.targetW, params.targetH, params.fitAlign);
     return { srcX, srcY, srcW, srcH, fittedWidth, fittedHeight, offsetX: offset.x, offsetY: offset.y };
-  }
-
-  if (params.mode === 'one-to-one') {
-    // Pixel-perfect placement: srcW ≤ targetW and srcH ≤ targetH guaranteed by clampBoxToDevice,
-    // so all fitOffset results are ≥ 0 and no clipping happens.
-    const offset = fitOffset(srcW, srcH, params.targetW, params.targetH, params.fitAlign);
-    return { srcX, srcY, srcW, srcH, fittedWidth: srcW, fittedHeight: srcH, offsetX: offset.x, offsetY: offset.y };
   }
 
   // Crop mode: box AR is always locked to device AR (the box machinery in `applyGeometry` enforces

@@ -9,6 +9,8 @@ export type AppAction =
   | { type: 'setDevice'; deviceKey: DeviceKey }
   | { type: 'setBackground'; background: FitBackground }
   | { type: 'image/setMode'; mode: ImageMode }
+  | { type: 'image/setModePreset'; mode: ImageMode; fitLockNative: boolean }
+  | { type: 'image/setFitLockNative'; fitLockNative: boolean }
   | { type: 'image/setFitAlign'; fitAlign: FitAlign }
   | { type: 'image/setContrast'; contrastValue: number }
   | { type: 'image/resetContrast' }
@@ -48,6 +50,8 @@ export const actions = {
   setDevice: (deviceKey: DeviceKey): AppAction => ({ type: 'setDevice', deviceKey }),
   setBackground: (background: FitBackground): AppAction => ({ type: 'setBackground', background }),
   imageSetMode: (mode: ImageMode): AppAction => ({ type: 'image/setMode', mode }),
+  imageSetModePreset: (mode: ImageMode, fitLockNative: boolean): AppAction => ({ type: 'image/setModePreset', mode, fitLockNative }),
+  imageSetFitLockNative: (fitLockNative: boolean): AppAction => ({ type: 'image/setFitLockNative', fitLockNative }),
   imageSetFitAlign: (fitAlign: FitAlign): AppAction => ({ type: 'image/setFitAlign', fitAlign }),
   imageSetContrast: (contrastValue: number): AppAction => ({ type: 'image/setContrast', contrastValue }),
   imageResetContrast: (): AppAction => ({ type: 'image/resetContrast' }),

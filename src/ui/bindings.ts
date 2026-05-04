@@ -7,6 +7,7 @@ import type { GbPaletteKey } from '../domain/formats/bmpGb';
 import type { FitAlign } from '../domain/geometry';
 import { initialImageState, type FitBackground, type ImageMode } from '../app/state';
 import type { AppDom } from './dom';
+import { isModePillActive } from './render';
 
 type BindingDeps = {
   store: AppStore;
@@ -124,10 +125,12 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
 
   for (const button of dom.modeButtons) {
     button.addEventListener('click', () => {
-      const mode = button.dataset.mode;
-      if (!mode) return;
-      if (store.getState().image.mode === mode) return;
-      appController.setImageMode(mode as ImageMode);
+      const datasetMode = button.dataset.mode;
+      if (!datasetMode) return;
+      if (isModePillActive(datasetMode, store.getState().image)) return;
+      const targetMode: ImageMode = datasetMode === 'crop' ? 'crop' : 'fit';
+      const targetLockNative = datasetMode === 'one-to-one';
+      appController.setImageMode(targetMode, { fitLockNative: targetLockNative });
     });
   }
 

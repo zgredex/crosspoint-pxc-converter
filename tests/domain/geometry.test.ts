@@ -34,6 +34,7 @@ describe('buildImageRenderPlan', () => {
       boxH: 801,
       fitSizePct: 100,
       fitNoUpscale: true,
+      fitLockNative: false,
     })).toEqual({
       srcX: 0,
       srcY: 0,
@@ -61,6 +62,7 @@ describe('buildImageRenderPlan', () => {
       boxH: 250,
       fitSizePct: 100,
       fitNoUpscale: false, // allow upscaling so 250→480
+      fitLockNative: false,
     });
     expect(plan).toMatchObject({ srcX: 100, srcY: 200, srcW: 250, srcH: 250 });
     expect(plan.fittedWidth).toBe(480);
@@ -84,6 +86,7 @@ describe('buildImageRenderPlan', () => {
       boxH: 1000,
       fitSizePct: 50,
       fitNoUpscale: true,
+      fitLockNative: false,
     });
     // max-fit at 100%: scale = min(480/1000, 800/1000) = 0.48 → fitted 480×480.
     // At 50%: scale = 0.24 → fitted 240×240. No upscaling involved.
@@ -108,6 +111,7 @@ describe('buildImageRenderPlan', () => {
       boxH: 200,
       fitSizePct: 100,
       fitNoUpscale: true,
+      fitLockNative: false,
     });
     // maxFit = min(480/200, 800/200) = 2.4 (would upscale). Guard caps at 1×.
     expect(plan.fittedWidth).toBe(200);
@@ -131,15 +135,16 @@ describe('buildImageRenderPlan', () => {
       boxH: 200,
       fitSizePct: 100,
       fitNoUpscale: false,
+      fitLockNative: false,
     });
     // maxFit = 2.4 → fitted 480×480.
     expect(plan.fittedWidth).toBe(480);
     expect(plan.fittedHeight).toBe(480);
   });
 
-  it('1:1 + sub-region centers the native-resolution region with letterbox', () => {
+  it('fit-locked-native + sub-region centers the native-resolution region with letterbox', () => {
     const plan = buildImageRenderPlan({
-      mode: 'one-to-one',
+      mode: 'fit',
       sourceW: 2000,
       sourceH: 2000,
       targetW: 480,
@@ -152,6 +157,7 @@ describe('buildImageRenderPlan', () => {
       boxH: 250,
       fitSizePct: 100,
       fitNoUpscale: true,
+      fitLockNative: true,
     });
     expect(plan.srcW).toBe(250);
     expect(plan.srcH).toBe(250);
@@ -161,9 +167,9 @@ describe('buildImageRenderPlan', () => {
     expect(plan.offsetY).toBe(275);
   });
 
-  it('1:1 + sub-region pinned top-right keeps native pixels', () => {
+  it('fit-locked-native + sub-region pinned top-right keeps native pixels', () => {
     const plan = buildImageRenderPlan({
-      mode: 'one-to-one',
+      mode: 'fit',
       sourceW: 2000,
       sourceH: 2000,
       targetW: 480,
@@ -176,11 +182,33 @@ describe('buildImageRenderPlan', () => {
       boxH: 250,
       fitSizePct: 100,
       fitNoUpscale: true,
+      fitLockNative: true,
     });
     expect(plan.fittedWidth).toBe(250);
     expect(plan.fittedHeight).toBe(250);
     expect(plan.offsetX).toBe(230);
     expect(plan.offsetY).toBe(0);
+  });
+
+  it('fit-locked-native ignores fitSizePct (scale stays 1 even at 50%)', () => {
+    const plan = buildImageRenderPlan({
+      mode: 'fit',
+      sourceW: 2000,
+      sourceH: 2000,
+      targetW: 480,
+      targetH: 800,
+      fitAlign: 'mc',
+      displayScale: 1,
+      boxX: 0,
+      boxY: 0,
+      boxW: 250,
+      boxH: 250,
+      fitSizePct: 50,
+      fitNoUpscale: false,
+      fitLockNative: true,
+    });
+    expect(plan.fittedWidth).toBe(250);
+    expect(plan.fittedHeight).toBe(250);
   });
 
   it('crop fills the device exactly; box srcW/srcH are derived from box ÷ displayScale', () => {
@@ -198,6 +226,7 @@ describe('buildImageRenderPlan', () => {
       boxH: 200,
       fitSizePct: 100,
       fitNoUpscale: true,
+      fitLockNative: false,
     })).toEqual({
       srcX: 20,
       srcY: 40,
@@ -225,6 +254,7 @@ describe('buildImageRenderPlan', () => {
       boxH: 480.5 * (800 / 480),
       fitSizePct: 100,
       fitNoUpscale: true,
+      fitLockNative: false,
     });
     expect(plan.fittedWidth).toBe(480);
     expect(plan.fittedHeight).toBe(800);

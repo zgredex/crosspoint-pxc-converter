@@ -2,6 +2,16 @@ import type { AppState } from '../app/state';
 import { computeGbDisplayScale } from '../domain/gb/displayScale';
 import type { AppDom } from './dom';
 
+// Three user-facing pills, two internal modes: '1:1' = fit + fitLockNative.
+// Used by both the active-pill predicate (here) and the no-op guard (in bindings.ts) — keep in lockstep.
+export function isModePillActive(datasetMode: string | undefined, image: AppState['image']): boolean {
+  if (!datasetMode) return false;
+  if (datasetMode === 'crop') return image.mode === 'crop';
+  if (datasetMode === 'fit') return image.mode === 'fit' && !image.fitLockNative;
+  if (datasetMode === 'one-to-one') return image.mode === 'fit' && image.fitLockNative;
+  return false;
+}
+
 function getPanelSection(element: Element): HTMLElement {
   const section = element.closest('.panel-section');
   if (!(section instanceof HTMLElement)) throw new Error('Expected panel section element');
@@ -42,15 +52,16 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.previewCanvas.style.aspectRatio = `${state.device.targetW} / ${state.device.targetH}`;
 
   setActive(dom.deviceButtons, button => button.dataset.xt === state.device.key);
-  setActive(dom.modeButtons, button => button.dataset.mode === state.image.mode);
+  setActive(dom.modeButtons, button => isModePillActive(button.dataset.mode, state.image));
   setActive(dom.ditherButtons, button => button.dataset.dither === state.image.ditherMode);
   setActive(dom.posButtons, button => button.dataset.pos === state.image.fitAlign);
   setActive(dom.bgButtons, button => button.dataset.bg === state.background);
   setActive(dom.gbPaletteButtons, button => button.dataset.gbpalette === state.gb.paletteKey);
 
   const positionGridUsable = state.image.mode !== 'crop';
+  const fitFreeScale = state.image.mode === 'fit' && !state.image.fitLockNative;
   dom.posSection.classList.toggle('disabled', !positionGridUsable);
-  dom.fitSizeRow.style.display = state.image.mode === 'fit' ? '' : 'none';
+  dom.fitSizeRow.style.display = fitFreeScale ? '' : 'none';
   let fitSizeMaxPct = 100;
   if (state.image.fitNoUpscale && state.image.sourceDims) {
     const rotated = state.image.rotation === 90 || state.image.rotation === 270;
@@ -63,7 +74,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.fitSizeSlider.max = String(fitSizeMaxPct);
   dom.fitSizeSlider.value = String(effectiveFitSizePct);
   dom.fitSizeValEl.textContent = `${effectiveFitSizePct}%`;
-  dom.fitNoUpscaleRow.style.display = state.image.mode === 'fit' ? '' : 'none';
+  dom.fitNoUpscaleRow.style.display = fitFreeScale ? '' : 'none';
   dom.fitNoUpscaleToggle.checked = state.image.fitNoUpscale;
   dom.mirrorHBtn.classList.toggle('active', state.image.mirrorH);
   dom.mirrorVBtn.classList.toggle('active', state.image.mirrorV);

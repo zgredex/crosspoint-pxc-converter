@@ -5,7 +5,7 @@ import type { GbPaletteKey } from '../domain/formats/bmpGb';
 
 export type LoadedType = 'image' | 'gb' | null;
 export type FitBackground = 'white' | 'black';
-export type ImageMode = 'crop' | 'fit' | 'one-to-one';
+export type ImageMode = 'crop' | 'fit';
 export type Rotation = 0 | 90 | 180 | 270;
 export type UiTone = 'error' | 'info' | null;
 
@@ -60,6 +60,7 @@ export type ImageState = {
   sourceDims: ImageDims | null;
   fitSizePct: number;
   fitNoUpscale: boolean;
+  fitLockNative: boolean;
 };
 
 export type GbState = {
@@ -114,6 +115,7 @@ export const initialImageState: ImageState = {
   sourceDims: null,
   fitSizePct: 100,
   fitNoUpscale: true,
+  fitLockNative: false,
 };
 
 export const initialGbState: GbState = {

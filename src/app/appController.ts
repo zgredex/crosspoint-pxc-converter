@@ -21,7 +21,7 @@ export type AppController = {
   handleGbVisualChange(): void;
   handleBackgroundChange(): void;
   setDevice(deviceKey: DeviceKey): void;
-  setImageMode(mode: ImageMode): void;
+  setImageMode(mode: ImageMode, opts?: { fitLockNative?: boolean }): void;
   setBackground(background: FitBackground): void;
   setGbPalette(paletteKey: GbPaletteKey): void;
   setGbInvert(invert: boolean): void;
@@ -103,9 +103,10 @@ export function createAppController(deps: AppControllerDeps): AppController {
     handleDeviceChange();
   }
 
-  function setImageMode(mode: ImageMode): void {
+  function setImageMode(mode: ImageMode, opts?: { fitLockNative?: boolean }): void {
     if (deps.imageRuntime.loadedImg) deps.imageController.notifyCropRegionChanged();
-    deps.store.dispatch(actions.imageSetMode(mode));
+    const fitLockNative = mode === 'fit' ? opts?.fitLockNative ?? false : false;
+    deps.store.dispatch(actions.imageSetModePreset(mode, fitLockNative));
     handleImageLayoutChange();
   }
 
