@@ -45,6 +45,18 @@ export async function renderImageBaseRaster(params: {
     extract = extractCanvas;
   }
 
+  // 1:1 placement (fittedW/H equal source dims) skips pica entirely — source pixels go straight
+  // to the target at native resolution, no resampling.
+  if (
+    params.plan.fittedWidth === params.plan.srcW &&
+    params.plan.fittedHeight === params.plan.srcH &&
+    params.plan.srcW > 0 &&
+    params.plan.srcH > 0
+  ) {
+    context.drawImage(extract, params.plan.offsetX, params.plan.offsetY);
+    return;
+  }
+
   const fittedCanvas = createCanvas(params.plan.fittedWidth, params.plan.fittedHeight);
   await stepDownscaleAndResize(params.pica, extract, fittedCanvas);
   context.drawImage(fittedCanvas, params.plan.offsetX, params.plan.offsetY);

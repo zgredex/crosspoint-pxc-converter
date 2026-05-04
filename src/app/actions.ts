@@ -2,13 +2,13 @@ import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { FitAlign } from '../domain/geometry';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
-import type { FitBackground, GbDims, GbFileInfo, ImageDims, LoadedType, Rotation, UiTone } from './state';
+import type { FitBackground, GbDims, GbFileInfo, ImageDims, ImageMode, LoadedType, Rotation, UiTone } from './state';
 
 export type AppAction =
   | { type: 'setLoadedType'; loadedType: LoadedType }
   | { type: 'setDevice'; deviceKey: DeviceKey }
   | { type: 'setBackground'; background: FitBackground }
-  | { type: 'image/setMode'; mode: 'crop' | 'fit' }
+  | { type: 'image/setMode'; mode: ImageMode }
   | { type: 'image/setFitAlign'; fitAlign: FitAlign }
   | { type: 'image/setContrast'; contrastValue: number }
   | { type: 'image/resetContrast' }
@@ -26,7 +26,8 @@ export type AppAction =
   | { type: 'image/setEditorZoom'; editorZoom: number }
   | { type: 'image/setEditorMaxZoom'; editorMaxZoom: number }
   | { type: 'image/setSourceDims'; dims: ImageDims | null }
-  | { type: 'image/setAspectRatioLocked'; locked: boolean }
+  | { type: 'image/setFitSizePct'; fitSizePct: number }
+  | { type: 'image/setFitNoUpscale'; fitNoUpscale: boolean }
   | { type: 'image/resetAll' }
   | { type: 'gb/setPalette'; paletteKey: GbPaletteKey }
   | { type: 'gb/setInvert'; invert: boolean }
@@ -46,7 +47,7 @@ export const actions = {
   setLoadedType: (loadedType: LoadedType): AppAction => ({ type: 'setLoadedType', loadedType }),
   setDevice: (deviceKey: DeviceKey): AppAction => ({ type: 'setDevice', deviceKey }),
   setBackground: (background: FitBackground): AppAction => ({ type: 'setBackground', background }),
-  imageSetMode: (mode: 'crop' | 'fit'): AppAction => ({ type: 'image/setMode', mode }),
+  imageSetMode: (mode: ImageMode): AppAction => ({ type: 'image/setMode', mode }),
   imageSetFitAlign: (fitAlign: FitAlign): AppAction => ({ type: 'image/setFitAlign', fitAlign }),
   imageSetContrast: (contrastValue: number): AppAction => ({ type: 'image/setContrast', contrastValue }),
   imageResetContrast: (): AppAction => ({ type: 'image/resetContrast' }),
@@ -69,7 +70,8 @@ export const actions = {
   imageSetEditorZoom: (editorZoom: number): AppAction => ({ type: 'image/setEditorZoom', editorZoom }),
   imageSetEditorMaxZoom: (editorMaxZoom: number): AppAction => ({ type: 'image/setEditorMaxZoom', editorMaxZoom }),
   imageSetSourceDims: (dims: ImageDims | null): AppAction => ({ type: 'image/setSourceDims', dims }),
-  imageSetAspectRatioLocked: (locked: boolean): AppAction => ({ type: 'image/setAspectRatioLocked', locked }),
+  imageSetFitSizePct: (fitSizePct: number): AppAction => ({ type: 'image/setFitSizePct', fitSizePct }),
+  imageSetFitNoUpscale: (fitNoUpscale: boolean): AppAction => ({ type: 'image/setFitNoUpscale', fitNoUpscale }),
   imageResetAll: (): AppAction => ({ type: 'image/resetAll' }),
   gbSetPalette: (paletteKey: GbPaletteKey): AppAction => ({ type: 'gb/setPalette', paletteKey }),
   gbSetInvert: (invert: boolean): AppAction => ({ type: 'gb/setInvert', invert }),

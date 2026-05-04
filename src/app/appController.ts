@@ -5,7 +5,7 @@ import { clearOutputBytes, type OutputRuntime } from './runtime/outputRuntime';
 import type { AppStore } from './store';
 import type { GbRuntime } from './runtime/gbRuntime';
 import type { ImageRuntime } from './runtime/imageRuntime';
-import type { FitBackground } from './state';
+import type { FitBackground, ImageMode } from './state';
 import { encodePxc } from '../domain/formats/pxc';
 import { encodeGrayBmp } from '../domain/formats/bmpGray';
 import { DITHER_FILENAME_SUFFIX } from '../domain/dither';
@@ -21,7 +21,7 @@ export type AppController = {
   handleGbVisualChange(): void;
   handleBackgroundChange(): void;
   setDevice(deviceKey: DeviceKey): void;
-  setImageMode(mode: 'crop' | 'fit'): void;
+  setImageMode(mode: ImageMode): void;
   setBackground(background: FitBackground): void;
   setGbPalette(paletteKey: GbPaletteKey): void;
   setGbInvert(invert: boolean): void;
@@ -103,7 +103,7 @@ export function createAppController(deps: AppControllerDeps): AppController {
     handleDeviceChange();
   }
 
-  function setImageMode(mode: 'crop' | 'fit'): void {
+  function setImageMode(mode: ImageMode): void {
     if (deps.imageRuntime.loadedImg) deps.imageController.notifyCropRegionChanged();
     deps.store.dispatch(actions.imageSetMode(mode));
     handleImageLayoutChange();

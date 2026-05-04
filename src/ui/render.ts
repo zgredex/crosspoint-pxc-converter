@@ -48,16 +48,30 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   setActive(dom.bgButtons, button => button.dataset.bg === state.background);
   setActive(dom.gbPaletteButtons, button => button.dataset.gbpalette === state.gb.paletteKey);
 
-  const positionGridUsable = state.image.mode === 'fit' || (state.image.mode === 'crop' && !state.image.aspectRatioLocked);
+  const positionGridUsable = state.image.mode !== 'crop';
   dom.posSection.classList.toggle('disabled', !positionGridUsable);
+  dom.fitSizeRow.style.display = state.image.mode === 'fit' ? '' : 'none';
+  let fitSizeMaxPct = 100;
+  if (state.image.fitNoUpscale && state.image.sourceDims) {
+    const rotated = state.image.rotation === 90 || state.image.rotation === 270;
+    const sW = rotated ? state.image.sourceDims.height : state.image.sourceDims.width;
+    const sH = rotated ? state.image.sourceDims.width : state.image.sourceDims.height;
+    const maxFit = Math.min(state.device.targetW / sW, state.device.targetH / sH);
+    if (maxFit > 1) fitSizeMaxPct = Math.max(10, Math.floor(100 / maxFit));
+  }
+  const effectiveFitSizePct = Math.min(state.image.fitSizePct, fitSizeMaxPct);
+  dom.fitSizeSlider.max = String(fitSizeMaxPct);
+  dom.fitSizeSlider.value = String(effectiveFitSizePct);
+  dom.fitSizeValEl.textContent = `${effectiveFitSizePct}%`;
+  dom.fitNoUpscaleRow.style.display = state.image.mode === 'fit' ? '' : 'none';
+  dom.fitNoUpscaleToggle.checked = state.image.fitNoUpscale;
   dom.mirrorHBtn.classList.toggle('active', state.image.mirrorH);
   dom.mirrorVBtn.classList.toggle('active', state.image.mirrorV);
   dom.autoLevelsBtn.classList.toggle('active', state.image.autoLevelsApplied);
 
   dom.invertToggle.checked = state.image.invert;
   dom.ditherToggle.checked = state.image.ditherEnabled;
-  dom.aspectRatioLockToggle.checked = state.image.aspectRatioLocked;
-  dom.cropBox.classList.toggle('unlocked', state.image.mode === 'crop' && !state.image.aspectRatioLocked);
+  dom.cropBox.classList.toggle('unlocked', state.image.mode !== 'crop');
   dom.ditherAlgos.classList.toggle('disabled', !state.image.ditherEnabled);
   for (const button of dom.ditherButtons) button.disabled = !state.image.ditherEnabled;
 
@@ -91,17 +105,16 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     : `Source${dimsSuffix}`;
   dom.sourceSubLabel.textContent = state.loadedType === 'gb'
     ? 'native palette'
-    : state.image.mode === 'crop'
+    : state.loadedType === 'image'
       ? 'drag or click to reposition'
       : '';
   dom.sourceSubLabel.hidden = dom.sourceSubLabel.textContent === '';
-  dom.cropBox.style.display = state.loadedType === 'image' && state.image.mode === 'crop' ? 'block' : 'none';
+  dom.cropBox.style.display = state.loadedType === 'image' ? 'block' : 'none';
 
   dom.rotateValEl.textContent = `${state.loadedType === 'gb' ? state.gb.rotation : state.image.rotation}°`;
 
   const isImage = state.loadedType === 'image';
   const isGb = state.loadedType === 'gb';
-  const isFit = isImage && state.image.mode === 'fit';
   const zoomLocked = isImage && state.image.editorMaxZoom <= 1.0001;
 
   if (isImage) {
@@ -110,7 +123,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     dom.zoomSlider.max = String(maxZoom);
     dom.zoomSlider.step = 'any';
     dom.zoomSlider.value = String(Math.min(maxZoom, Math.max(1, state.image.editorZoom)));
-    dom.zoomSlider.disabled = isFit || zoomLocked;
+    dom.zoomSlider.disabled = zoomLocked;
   } else if (isGb) {
     const gbZoom = state.gb.zoom > 0
       ? state.gb.zoom
@@ -130,7 +143,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
     dom.zoomSlider.disabled = true;
   }
 
-  if (!isImage || isFit) {
+  if (!isImage) {
     dom.zoomHint.hidden = true;
     dom.zoomHint.textContent = '';
   } else {

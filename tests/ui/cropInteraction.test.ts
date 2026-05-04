@@ -101,8 +101,8 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
-      getAspectRatioLocked: () => true,
       getBoxState: () => boxState,
+      clampBox: ({ srcW, srcH }) => ({ srcW, srcH }),
       setBoxPosition: (x, y) => {
         boxState.boxX = x;
         boxState.boxY = y;
@@ -161,7 +161,7 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
-      getAspectRatioLocked: () => true,
+      clampBox: ({ srcW, srcH }) => ({ srcW, srcH }),
       getBoxState: () => ({
         dispImgW: 500,
         dispImgH: 400,
@@ -219,7 +219,7 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
-      getAspectRatioLocked: () => true,
+      clampBox: ({ srcW, srcH }) => ({ srcW, srcH }),
       getBoxState: () => ({
         dispImgW: 500,
         dispImgH: 400,
@@ -292,7 +292,7 @@ describe('setupCropInteraction', () => {
       getEditorZoom: () => 1,
       applyEditorZoom: vi.fn(),
       getMode: () => 'crop',
-      getAspectRatioLocked: () => true,
+      clampBox: ({ srcW, srcH }) => ({ srcW, srcH }),
       getBoxState: () => ({
         dispImgW: 500,
         dispImgH: 400,

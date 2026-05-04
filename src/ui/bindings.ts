@@ -5,7 +5,7 @@ import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
 import type { FitAlign } from '../domain/geometry';
-import { initialImageState, type FitBackground } from '../app/state';
+import { initialImageState, type FitBackground, type ImageMode } from '../app/state';
 import type { AppDom } from './dom';
 
 type BindingDeps = {
@@ -14,7 +14,6 @@ type BindingDeps = {
   scheduleConvert: () => void;
   autoLevels: () => void | Promise<void>;
   invalidateBaseRaster: () => void;
-  notifyAspectRatioLockChanged: () => void;
 };
 
 export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
@@ -35,9 +34,36 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     scheduleConvert();
   });
 
-  dom.aspectRatioLockToggle.addEventListener('change', () => {
-    store.dispatch(actions.imageSetAspectRatioLocked(dom.aspectRatioLockToggle.checked));
-    deps.notifyAspectRatioLockChanged();
+  dom.fitSizeSlider.addEventListener('input', () => {
+    store.dispatch(actions.imageSetFitSizePct(parseInt(dom.fitSizeSlider.value)));
+    deps.invalidateBaseRaster();
+    scheduleConvert();
+  });
+
+  dom.fitNoUpscaleToggle.addEventListener('change', () => {
+    const noUpscale = dom.fitNoUpscaleToggle.checked;
+    store.dispatch(actions.imageSetFitNoUpscale(noUpscale));
+    // When the guard turns on, snap the size slider down to the largest value that doesn't
+    // upscale, so the displayed slider value matches the effective scale. Without this the
+    // slider would read 100% while the actual output is capped at native size — confusing.
+    if (noUpscale) {
+      const state = store.getState();
+      const dims = state.image.sourceDims;
+      if (dims) {
+        const rotated = state.image.rotation === 90 || state.image.rotation === 270;
+        const sW = rotated ? dims.height : dims.width;
+        const sH = rotated ? dims.width : dims.height;
+        const maxFit = Math.min(state.device.targetW / sW, state.device.targetH / sH);
+        if (maxFit > 1) {
+          const maxPct = Math.max(10, Math.floor(100 / maxFit));
+          if (state.image.fitSizePct > maxPct) {
+            store.dispatch(actions.imageSetFitSizePct(maxPct));
+          }
+        }
+      }
+    }
+    deps.invalidateBaseRaster();
+    scheduleConvert();
   });
 
   dom.contrastSlider.addEventListener('input', () => {
@@ -101,7 +127,7 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
       const mode = button.dataset.mode;
       if (!mode) return;
       if (store.getState().image.mode === mode) return;
-      appController.setImageMode(mode as 'crop' | 'fit');
+      appController.setImageMode(mode as ImageMode);
     });
   }
 

@@ -1,4 +1,4 @@
-import { clampCropBox } from '../domain/geometry';
+import type { ImageMode } from '../app/state';
 
 type BoxState = {
   dispImgW: number;
@@ -28,9 +28,9 @@ type CropInteractionDeps = {
   isImageLoaded: () => boolean;
   getEditorZoom: () => number;
   applyEditorZoom: (targetZoom: number, anchorClientX?: number, anchorClientY?: number) => void;
-  getMode: () => 'crop' | 'fit';
-  getAspectRatioLocked: () => boolean;
+  getMode: () => ImageMode;
   getBoxState: () => BoxState;
+  clampBox: (params: { srcW: number; srcH: number; sourceW: number; sourceH: number; targetW: number; targetH: number }) => { srcW: number; srcH: number };
   setBoxPosition: (x: number, y: number) => void;
   setBoxSize: (w: number, h: number) => void;
   applyCropBox: (scrollIntoView?: boolean) => void;
@@ -77,7 +77,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
   }
 
   function isCropEditorActive(): boolean {
-    return deps.isImageLoaded() && deps.getMode() === 'crop';
+    return deps.isImageLoaded();
   }
 
   function shouldCaptureEditorKeys(): boolean {
@@ -106,7 +106,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
 
   function onDragStart(event: MouseEvent | TouchEvent): void {
     if (isDragging || isResizing) return;
-    if (deps.getMode() !== 'crop') return;
+    if (!deps.isImageLoaded()) return;
     event.preventDefault();
     isDragging = true;
     didDrag = false;
@@ -160,7 +160,8 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
 
   function onHandleStart(handle: HandleDirection, event: MouseEvent | TouchEvent): void {
     if (isDragging || isResizing) return;
-    if (!isCropEditorActive() || deps.getAspectRatioLocked()) return;
+    if (!deps.isImageLoaded()) return;
+    if (deps.getMode() === 'crop') return;
     event.preventDefault();
     event.stopPropagation();
     isResizing = true;
@@ -209,7 +210,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
       srcY = bottomEdge - srcH;
     }
 
-    const clamped = clampCropBox({
+    const clamped = deps.clampBox({
       srcW,
       srcH,
       sourceW: state.sourceW,
@@ -286,7 +287,7 @@ export function setupCropInteraction(deps: CropInteractionDeps): { clearSnap: ()
   window.addEventListener('touchcancel', onHandleEnd);
 
   deps.sourceCanvas.addEventListener('click', event => {
-    if (deps.getMode() !== 'crop') return;
+    if (!deps.isImageLoaded()) return;
     if (didDrag || didResize) {
       didDrag = false;
       didResize = false;

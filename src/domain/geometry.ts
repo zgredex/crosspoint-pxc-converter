@@ -29,7 +29,7 @@ export type EditorGeometry = {
 };
 
 export function computeEditorGeometry(params: {
-  mode: 'crop' | 'fit';
+  mode: 'crop' | 'fit' | 'one-to-one';
   sourceW: number;
   sourceH: number;
   targetW: number;
@@ -41,7 +41,11 @@ export function computeEditorGeometry(params: {
   const baseDisplayScale = Math.min(params.frameMaxW / params.sourceW, params.frameMaxH / params.sourceH);
   const baseCropScale = Math.max(params.targetW / params.sourceW, params.targetH / params.sourceH);
   const fitScale = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
-  const maxZoom = params.mode === 'crop' ? Math.max(1, 1 / baseCropScale) : 1;
+  // Crop maxZoom: zoom until the source pixel-grid fills the device on the larger axis.
+  // Fit / 1:1 maxZoom: zoom until 1 source pixel = 1 screen pixel (displayScale = 1).
+  const maxZoom = params.mode === 'crop'
+    ? Math.max(1, 1 / baseCropScale)
+    : Math.max(1, 1 / baseDisplayScale);
   const clampedZoom = Math.min(Math.max(1, params.editorZoom), maxZoom);
   const displayScale = baseDisplayScale * clampedZoom;
   const workScale = params.mode === 'crop' ? baseCropScale * clampedZoom : fitScale;
@@ -73,7 +77,29 @@ export function fitOffset(fw: number, fh: number, targetW: number, targetH: numb
 // So both axes must be ≥ target, capped at source. When `sourceX < targetX`, upscale on that
 // axis is unavoidable; the rule degrades to `srcX ≥ sourceX` (i.e. you must keep the full
 // source on that axis), which is the closest we can get to "no upscale" given the source.
-export function clampCropBox(params: {
+const FIT_MIN_BOX = 8;
+
+// Fit-mode box clamp: source bounds + a usability minimum so the box can't shrink below
+// FIT_MIN_BOX × FIT_MIN_BOX source pixels (or the source itself, when smaller). No no-upscale
+// rule — fit mode lets the user pick a region smaller than the device on purpose.
+export function clampBoxToSource(params: {
+  srcW: number;
+  srcH: number;
+  sourceW: number;
+  sourceH: number;
+}): { srcW: number; srcH: number } {
+  const minW = Math.min(FIT_MIN_BOX, params.sourceW);
+  const minH = Math.min(FIT_MIN_BOX, params.sourceH);
+  const srcW = Math.max(minW, Math.min(params.sourceW, Math.round(params.srcW)));
+  const srcH = Math.max(minH, Math.min(params.sourceH, Math.round(params.srcH)));
+  return { srcW, srcH };
+}
+
+// 1:1-mode box clamp: same as clampBoxToSource, but additionally caps each axis to the device
+// dim. 1:1 places source pixels at native resolution; if the box exceeds the device, drawImage
+// would silently clip — pixel preservation is the whole point of 1:1, so forbid oversize at the
+// box level instead.
+export function clampBoxToDevice(params: {
   srcW: number;
   srcH: number;
   sourceW: number;
@@ -81,15 +107,17 @@ export function clampCropBox(params: {
   targetW: number;
   targetH: number;
 }): { srcW: number; srcH: number } {
-  let srcW = Math.max(1, Math.min(params.sourceW, Math.round(params.srcW)));
-  let srcH = Math.max(1, Math.min(params.sourceH, Math.round(params.srcH)));
-  srcW = Math.max(srcW, Math.min(params.targetW, params.sourceW));
-  srcH = Math.max(srcH, Math.min(params.targetH, params.sourceH));
+  const maxW = Math.min(params.sourceW, params.targetW);
+  const maxH = Math.min(params.sourceH, params.targetH);
+  const minW = Math.min(FIT_MIN_BOX, maxW);
+  const minH = Math.min(FIT_MIN_BOX, maxH);
+  const srcW = Math.max(minW, Math.min(maxW, Math.round(params.srcW)));
+  const srcH = Math.max(minH, Math.min(maxH, Math.round(params.srcH)));
   return { srcW, srcH };
 }
 
 export function buildImageRenderPlan(params: {
-  mode: 'crop' | 'fit';
+  mode: 'crop' | 'fit' | 'one-to-one';
   sourceW: number;
   sourceH: number;
   targetW: number;
@@ -100,65 +128,50 @@ export function buildImageRenderPlan(params: {
   boxY: number;
   boxW: number;
   boxH: number;
-  aspectRatioLocked: boolean;
+  fitSizePct: number;
+  fitNoUpscale: boolean;
 }): ImageRenderPlan {
-  if (params.mode === 'fit') {
-    const fitScale = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
-    const fittedWidth = Math.max(1, Math.round(params.sourceW * fitScale));
-    const fittedHeight = Math.max(1, Math.round(params.sourceH * fitScale));
-    const offset = fitOffset(fittedWidth, fittedHeight, params.targetW, params.targetH, params.fitAlign);
-    return {
-      srcX: 0,
-      srcY: 0,
-      srcW: params.sourceW,
-      srcH: params.sourceH,
-      fittedWidth,
-      fittedHeight,
-      offsetX: offset.x,
-      offsetY: offset.y,
-    };
-  }
-
   const srcX = Math.max(0, Math.round(params.boxX / params.displayScale));
   const srcY = Math.max(0, Math.round(params.boxY / params.displayScale));
   const srcW = Math.max(1, Math.min(params.sourceW - srcX, Math.round(params.boxW / params.displayScale)));
   const srcH = Math.max(1, Math.min(params.sourceH - srcY, Math.round(params.boxH / params.displayScale)));
 
-  // Locked-AR crop is a contract: the box matches the device aspect ratio, so the output must
-  // fill the device exactly. Rounding `boxW/H ÷ displayScale` to integer source pixels can drift
-  // the srcW/srcH ratio by a fraction, which would otherwise leave a 1-px fit-bg sliver on one rim.
-  if (params.aspectRatioLocked) {
-    return {
-      srcX,
-      srcY,
-      srcW,
-      srcH,
-      fittedWidth: params.targetW,
-      fittedHeight: params.targetH,
-      offsetX: 0,
-      offsetY: 0,
-    };
+  if (params.mode === 'fit') {
+    const factor = Math.max(0.01, Math.min(1, params.fitSizePct / 100));
+    const baseScale = Math.min(params.targetW / srcW, params.targetH / srcH);
+    let scale = baseScale * factor;
+    // No-upscale guard: small sources stay at native resolution rather than being resampled larger.
+    if (params.fitNoUpscale && scale > 1) scale = 1;
+    let fittedWidth = Math.max(1, Math.round(srcW * scale));
+    let fittedHeight = Math.max(1, Math.round(srcH * scale));
+    // 1-px snap-up applies only at full fit; sub-fit factors are deliberate undersize.
+    if (factor === 1 && scale === baseScale) {
+      if (params.targetW - fittedWidth === 1) fittedWidth = params.targetW;
+      if (params.targetH - fittedHeight === 1) fittedHeight = params.targetH;
+    }
+    const offset = fitOffset(fittedWidth, fittedHeight, params.targetW, params.targetH, params.fitAlign);
+    return { srcX, srcY, srcW, srcH, fittedWidth, fittedHeight, offsetX: offset.x, offsetY: offset.y };
   }
 
-  const cropFitScale = Math.min(params.targetW / srcW, params.targetH / srcH);
-  const rawFittedWidth = Math.max(1, Math.round(srcW * cropFitScale));
-  const rawFittedHeight = Math.max(1, Math.round(srcH * cropFitScale));
-  // cropFitScale's min branch lands one axis exactly on its target; the other can round 1 px
-  // short due to integer srcW/srcH from box-÷-displayScale rounding. Snap that 1-px deficit up
-  // so we don't render a 1-px fit-bg sliver at the rim. Real letterboxes are far larger.
-  const fittedWidth = params.targetW - rawFittedWidth === 1 ? params.targetW : rawFittedWidth;
-  const fittedHeight = params.targetH - rawFittedHeight === 1 ? params.targetH : rawFittedHeight;
-  const offset = fitOffset(fittedWidth, fittedHeight, params.targetW, params.targetH, params.fitAlign);
+  if (params.mode === 'one-to-one') {
+    // Pixel-perfect placement: srcW ≤ targetW and srcH ≤ targetH guaranteed by clampBoxToDevice,
+    // so all fitOffset results are ≥ 0 and no clipping happens.
+    const offset = fitOffset(srcW, srcH, params.targetW, params.targetH, params.fitAlign);
+    return { srcX, srcY, srcW, srcH, fittedWidth: srcW, fittedHeight: srcH, offsetX: offset.x, offsetY: offset.y };
+  }
 
+  // Crop mode: box AR is always locked to device AR (the box machinery in `applyGeometry` enforces
+  // it). Output fills the device exactly; rounding drift from box-÷-displayScale is absorbed by the
+  // fixed fittedWidth=targetW / fittedHeight=targetH.
   return {
     srcX,
     srcY,
     srcW,
     srcH,
-    fittedWidth,
-    fittedHeight,
-    offsetX: offset.x,
-    offsetY: offset.y,
+    fittedWidth: params.targetW,
+    fittedHeight: params.targetH,
+    offsetX: 0,
+    offsetY: 0,
   };
 }
 

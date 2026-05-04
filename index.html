@@ -95,15 +95,21 @@
         </div>
 
         <div class="panel-section" id="scaleSection">
-          <p class="panel-heading">Scale<button class="help-tip" type="button" data-tip="Fit shows the whole image with empty space filled by the background. Crop selects a region of the source to fill the device exactly. Unlock the aspect ratio to crop to a custom shape." aria-label="About scale mode">?</button></p>
+          <p class="panel-heading">Scale<button class="help-tip" type="button" data-tip="Crop fills the device with the selected region. Fit scales the region preserving aspect ratio with letterbox. 1:1 places the region at native pixel resolution (no resampling) — the box is capped to device dims." aria-label="About scale mode">?</button></p>
           <div class="pill-group">
-            <button class="pill" id="fitBtn" data-mode="fit">Fit</button>
-            <button class="pill active" id="cropBtn" data-mode="crop">Crop</button>
+            <button class="pill active" id="cropBtn" data-mode="crop" title="Fill the device with the cropped region (resampled)">Crop</button>
+            <button class="pill" id="fitBtn" data-mode="fit" title="AR-preserving fit with letterbox; size slider lets you place the region smaller than the device">Fit</button>
+            <button class="pill" id="oneToOneBtn" data-mode="one-to-one" title="Native size — pixel-perfect placement, no resampling">1:1</button>
           </div>
-          <div class="toggle-row" id="aspectRatioLockRow">
-            <span class="toggle-label">Aspect ratio<button class="help-tip" type="button" data-tip="When locked, the crop matches the device shape exactly (default). When unlocked, drag the corner or edge handles to resize freely. Output is letterboxed onto the device using the position grid below." aria-label="About aspect ratio lock">?</button></span>
+          <div class="tone-row" id="fitSizeRow" style="display: none;">
+            <span class="tone-label">Size<button class="help-tip" type="button" data-tip="Scale the cropped region between native size (10%) and full Fit (100%). Lower values produce a smaller image with more letterbox around it." aria-label="About fit size">?</button></span>
+            <input type="range" id="fitSizeSlider" class="tone-slider" min="10" max="100" value="100" step="1">
+            <span class="tone-val" id="fitSizeVal">100%</span>
+          </div>
+          <div class="toggle-row" id="fitNoUpscaleRow" style="display: none;">
+            <span class="toggle-label">No upscale<button class="help-tip" type="button" data-tip="When on, Fit caps the scaling at 1× — small sources stay at native pixel size rather than being resampled bigger. Turn off to allow upscaling small sources to fill the device." aria-label="About no-upscale guard">?</button></span>
             <label class="toggle">
-              <input type="checkbox" id="aspectRatioLockToggle" checked>
+              <input type="checkbox" id="fitNoUpscaleToggle" checked>
               <span class="toggle-track"></span>
             </label>
           </div>

@@ -17,12 +17,14 @@ import { createCanvas, getContext2d } from '../../infra/canvas/context';
 import type { PicaResizer } from '../../infra/canvas/picaResize';
 import {
   buildImageRenderPlan,
-  clampCropBox,
+  clampBoxToDevice,
+  clampBoxToSource,
   computeEditorGeometry,
   getImageAnalysisRegion,
   type EditorGeometry,
   type ImageRenderPlan,
 } from '../../domain/geometry';
+import type { ImageMode } from '../../app/state';
 import { buildUintHistogram } from '../../domain/histogram';
 import { buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
 import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/imageLoader';
@@ -39,7 +41,6 @@ export type ImageController = {
   resetEditor(): Promise<void>;
   autoLevels(): Promise<void>;
   notifyCropRegionChanged(): void;
-  notifyAspectRatioLockChanged(): void;
   requestConvert(): void;
   invalidateBaseRaster(): void;
   refreshTransformedSource(): Promise<void>;
@@ -74,6 +75,16 @@ type ImageControllerDeps = {
 const MAX_EDITOR_WIDTH = 340;
 const MAX_EDITOR_HEIGHT = 520;
 
+function clampBoxForMode(
+  mode: ImageMode,
+  params: { srcW: number; srcH: number; sourceW: number; sourceH: number; targetW: number; targetH: number },
+): { srcW: number; srcH: number } {
+  if (mode === 'one-to-one') return clampBoxToDevice(params);
+  // 'crop' mode never reaches here — its box is fully recomputed from device AR in `applyGeometry`,
+  // not preserved across changes. Fit and fall-through default to source-bound clamp.
+  return clampBoxToSource(params);
+}
+
 export function createImageController(deps: ImageControllerDeps): ImageController {
   function getState() {
     return deps.store.getState();
@@ -106,7 +117,8 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
       boxY: deps.runtime.boxY,
       boxW: deps.runtime.boxW,
       boxH: deps.runtime.boxH,
-      aspectRatioLocked: state.image.aspectRatioLocked,
+      fitSizePct: state.image.fitSizePct,
+      fitNoUpscale: state.image.fitNoUpscale,
     });
   }
 
@@ -312,13 +324,25 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     const lockedBoxH = Math.min((state.device.targetH / geom.workScale) * geom.displayScale, geom.dispImgH);
     let boxW = lockedBoxW;
     let boxH = lockedBoxH;
-    if (!state.image.aspectRatioLocked) {
+    if (state.image.mode !== 'crop') {
       const prevBoxSrcW = oldDisplay > 0 ? deps.runtime.boxW / oldDisplay : 0;
       const prevBoxSrcH = oldDisplay > 0 ? deps.runtime.boxH / oldDisplay : 0;
       if (prevBoxSrcW > 0 && prevBoxSrcH > 0) {
-        const clamped = clampCropBox({
+        const clamped = clampBoxForMode(state.image.mode, {
           srcW: prevBoxSrcW,
           srcH: prevBoxSrcH,
+          sourceW,
+          sourceH,
+          targetW: state.device.targetW,
+          targetH: state.device.targetH,
+        });
+        boxW = clamped.srcW * geom.displayScale;
+        boxH = clamped.srcH * geom.displayScale;
+      } else if (state.image.mode === 'one-to-one') {
+        // First-paint default for 1:1: cap full-image box to device dims.
+        const clamped = clampBoxToDevice({
+          srcW: lockedBoxW / geom.displayScale,
+          srcH: lockedBoxH / geom.displayScale,
           sourceW,
           sourceH,
           targetW: state.device.targetW,
@@ -343,21 +367,16 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     frame.style.width = `${Math.min(geom.dispImgW, MAX_EDITOR_WIDTH)}px`;
     frame.style.height = `${Math.min(geom.dispImgH, MAX_EDITOR_HEIGHT)}px`;
 
-    if (state.image.mode === 'crop') {
-      applyCropBoxToDom({
-        runtime: deps.runtime,
-        cropBox: deps.elements.cropBox,
-        sourceFrame: frame,
-        scrollIntoView: anchor.kind === 'box',
-      });
-    }
+    applyCropBoxToDom({
+      runtime: deps.runtime,
+      cropBox: deps.elements.cropBox,
+      sourceFrame: frame,
+      scrollIntoView: anchor.kind === 'box',
+    });
     if (anchor.kind === 'point') {
       frame.scrollLeft = anchorSx * geom.displayScale - anchorFx;
       frame.scrollTop = anchorSy * geom.displayScale - anchorFy;
-
-      if (state.image.mode === 'crop') {
-        nudgeCropBoxIntoView({ runtime: deps.runtime, sourceFrame: frame, margin: 0 });
-      }
+      nudgeCropBoxIntoView({ runtime: deps.runtime, sourceFrame: frame, margin: 0 });
     }
 
     if (Math.abs(state.image.editorMaxZoom - geom.maxZoom) > 1e-4) {
@@ -511,20 +530,12 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     rasterDirty = true;
   }
 
-  function notifyAspectRatioLockChanged(): void {
-    if (!deps.runtime.loadedImg) return;
-    rasterDirty = true;
-    void resetEditor(false);
-    notifyCropRegionChanged();
-  }
-
   return {
     loadImageFile,
     unloadImage,
     resetEditor,
     autoLevels,
     notifyCropRegionChanged,
-    notifyAspectRatioLockChanged,
     requestConvert,
     invalidateBaseRaster,
     refreshTransformedSource,

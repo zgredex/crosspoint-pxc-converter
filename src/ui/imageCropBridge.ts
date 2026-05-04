@@ -3,6 +3,7 @@ import type { AppDom } from './dom';
 import { setupCropInteraction } from './cropInteraction';
 import { setBoxPosition, setBoxSize, type ImageRuntime } from '../app/runtime/imageRuntime';
 import { applyCropBoxToDom, nudgeCropBoxIntoView as nudgeCropBox } from '../features/image/cropBox';
+import { clampBoxToDevice, clampBoxToSource } from '../domain/geometry';
 
 const SNAP_THRESHOLD = 9;
 const WHEEL_ZOOM_K = 0.0015;
@@ -39,7 +40,6 @@ export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: ()
     getEditorZoom: () => deps.store.getState().image.editorZoom,
     applyEditorZoom: deps.applyEditorZoom,
     getMode: () => deps.store.getState().image.mode,
-    getAspectRatioLocked: () => deps.store.getState().image.aspectRatioLocked,
     getBoxState: () => {
       const state = deps.store.getState();
       const { w: sourceW, h: sourceH } = getRotatedSourceDims();
@@ -56,6 +56,13 @@ export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: ()
         targetW: state.device.targetW,
         targetH: state.device.targetH,
       };
+    },
+    clampBox: params => {
+      const mode = deps.store.getState().image.mode;
+      if (mode === 'one-to-one') return clampBoxToDevice(params);
+      // 'crop' mode disables resize handles, so this is reached only for 'fit' (and the
+      // defensive 'crop' fallthrough that never fires in practice).
+      return clampBoxToSource(params);
     },
     setBoxPosition: (x, y) => setBoxPosition(deps.runtime, x, y),
     setBoxSize: (w, h) => setBoxSize(deps.runtime, w, h),
