@@ -25,6 +25,7 @@ import {
   type ImageRenderPlan,
 } from '../../domain/geometry';
 import { buildUintHistogram } from '../../domain/histogram';
+import { getQuantPreset } from '../../domain/quantize';
 import { buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
 import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/imageLoader';
 import { renderHistogram } from '../../infra/canvas/histogramRenderer';
@@ -504,6 +505,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
         invert: state.image.invert,
         ditherEnabled: state.image.ditherEnabled,
         ditherMode: state.image.ditherMode,
+        quantPreset: getQuantPreset(),
       },
       deps.runtime.processVersion,
     );

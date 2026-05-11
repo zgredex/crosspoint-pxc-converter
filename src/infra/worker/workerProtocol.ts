@@ -1,4 +1,5 @@
 import type { DitherMode } from '../../domain/dither';
+import type { QuantPreset } from '../../domain/quantize';
 
 export type WorkerSettings = {
   blackPoint: number;
@@ -8,6 +9,7 @@ export type WorkerSettings = {
   invert: boolean;
   ditherEnabled: boolean;
   ditherMode: DitherMode;
+  quantPreset: QuantPreset;
 };
 
 export type WorkerInMessage =

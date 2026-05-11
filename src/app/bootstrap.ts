@@ -23,6 +23,7 @@ import { bindFileInput } from '../ui/fileInput';
 import { bindGbScaleControls } from '../ui/gbControls';
 import { bindImageControls } from '../ui/imageControls';
 import { setupPreviewZoom } from '../ui/previewZoom';
+import { installQuantPresetToggle } from '../ui/quantPresetToggle';
 import { renderStoreState } from '../ui/render';
 import { bindRotationControls } from '../ui/rotationControls';
 import { bindZoomControls } from '../ui/zoomControls';
@@ -181,6 +182,10 @@ bindDownloadButtons({
   dom,
   onDownloadPxc: appController.downloadPxc,
   onDownloadBmp: appController.downloadBmp,
+});
+
+installQuantPresetToggle({
+  requestReprocess: () => imageController.requestConvert(),
 });
 
 render();
