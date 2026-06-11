@@ -178,6 +178,9 @@ export function createAppController(deps: AppControllerDeps): AppController {
     if (state.loadedType === 'image') {
       const px = deps.imageRuntime.lastIndexedPixels;
       if (!px) return;
+      // Stale buffer from before a device switch — the re-convert hasn't landed yet; encoding
+      // it against the new dims would produce a structurally corrupt file.
+      if (px.length !== state.device.targetW * state.device.targetH) return;
       triggerDownload(encoder(px, state.device.targetW, state.device.targetH), filename, mime);
       return;
     }

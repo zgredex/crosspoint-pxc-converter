@@ -158,7 +158,7 @@ The GB-Printer text-log parser reads hex byte lines and extracts the `PRNT` pale
 ### Preview
 
 - The output preview canvas updates live on every control change.
-- A 3.5× zoom loupe follows the cursor over the preview for pixel-level inspection.
+- A 3.6× zoom loupe follows the cursor over the preview for pixel-level inspection.
 
 ### Export
 

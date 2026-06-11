@@ -6,7 +6,7 @@ import { setOutputBytes, type OutputRuntime } from '../../app/runtime/outputRunt
 import type { Rotation } from '../../app/state';
 import { decode2bpp } from '../../domain/gb/decode2bpp';
 import { parsePrinterTxt } from '../../domain/gb/parsePrinterTxt';
-import { rotatePixels } from '../../domain/gb/rotatePixels';
+import { computeMaxGbOutputScale } from '../../domain/gb/displayScale';
 import { readFileAsArrayBuffer, readFileAsText } from '../../infra/browser/imageLoader';
 import { renderGbSourceCanvas } from '../../infra/canvas/gbSourceRenderer';
 import { renderIndexedPreview } from '../../infra/canvas/previewRenderer';
@@ -84,12 +84,17 @@ export function createGbController(deps: GbControllerDeps): GbController {
   function buildOutput(): void {
     const { pixels, width, height } = requireDecoded();
     const state = getState();
+    const maxScale = computeMaxGbOutputScale(width, height, state.gb.rotation, state.device.targetW, state.device.targetH);
+    const outputScale = Math.min(state.gb.outputScale, maxScale);
+    if (outputScale !== state.gb.outputScale) {
+      deps.store.dispatch(actions.gbSetOutputScale(outputScale));
+    }
     const outputs = buildGbOutputArtifacts({
       pixels,
       width,
       height,
       rotation: state.gb.rotation,
-      outputScale: state.gb.outputScale,
+      outputScale,
       targetW: state.device.targetW,
       targetH: state.device.targetH,
       background: state.background,
@@ -186,9 +191,8 @@ export function createGbController(deps: GbControllerDeps): GbController {
     const next = state.gb.outputScale + delta;
     if (next < 1) return;
     if (delta === 1) {
-      const { pixels, width, height } = requireDecoded();
-      const rotated = rotatePixels(pixels, width, height, state.gb.rotation);
-      const maxScale = Math.min(Math.floor(state.device.targetW / rotated.w), Math.floor(state.device.targetH / rotated.h));
+      const { width, height } = requireDecoded();
+      const maxScale = computeMaxGbOutputScale(width, height, state.gb.rotation, state.device.targetW, state.device.targetH);
       if (next > maxScale) return;
     }
     deps.store.dispatch(actions.gbSetOutputScale(next));

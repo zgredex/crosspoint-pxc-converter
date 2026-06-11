@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../src/infra/canvas/previewRenderer', () => ({ renderIndexedPreview: vi.fn() }));
+vi.mock('../../src/infra/canvas/gbSourceRenderer', () => ({ renderGbSourceCanvas: vi.fn() }));
+
 import { initialAppState } from '../../src/app/state';
 import type { AppStore } from '../../src/app/store';
 import { createGbRuntime } from '../../src/app/runtime/gbRuntime';
@@ -65,5 +68,42 @@ describe('gb controller', () => {
     controller.setZoom(3);
 
     expect(store.actions).toContainEqual({ type: 'gb/setZoom', zoom: 3 });
+  });
+
+  it('buildOutput clamps outputScale to device max and dispatches gbSetOutputScale', () => {
+    // Art: 160×400 at rotation=0 on X4 (480×800)
+    // maxScale = min(floor(480/160), floor(800/400)) = min(3, 2) = 2
+    // state has outputScale=3 → should be clamped to 2
+    const state = {
+      ...initialAppState,
+      gb: {
+        ...initialAppState.gb,
+        outputScale: 3,
+        dims: { width: 160, height: 400 },
+      },
+    };
+    const store = createMockStore(state);
+
+    const runtime = createGbRuntime();
+    // 160×400 indexed pixel buffer (values 0–3)
+    runtime.pixels = new Uint8Array(160 * 400);
+
+    const controller = createGbController({
+      store,
+      elements: {} as never,
+      runtime,
+      output: createOutputRuntime(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
+      validateGbBytes: vi.fn(),
+    });
+
+    controller.buildOutput();
+
+    expect(store.actions).toContainEqual({ type: 'gb/setOutputScale', outputScale: 2 });
   });
 });

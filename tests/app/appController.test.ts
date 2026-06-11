@@ -128,6 +128,70 @@ describe('appController', () => {
     expect(gbController.buildOutput).toHaveBeenCalledOnce();
   });
 
+  it('guards image downloads against a stale-size pixel buffer', () => {
+    const downloadSpy = vi.mocked(triggerDownload);
+
+    // Negative control: lastIndexedPixels has wrong size (stale from old device)
+    downloadSpy.mockClear();
+    const staleController = createAppController({
+      store: createMockStore({ ...initialAppState, loadedType: 'image' }),
+      workCanvas: { width: 0, height: 0 } as never,
+      previewCanvas: { width: 0, height: 0 } as never,
+      imageRuntime: { loadedImg: {}, lastIndexedPixels: new Uint8Array(10) } as never,
+      gbRuntime: { pixels: null } as never,
+      output: { pxcBytes: null, bmpBytes: null },
+      imageController: {
+        resetEditor: vi.fn(),
+        requestConvert: vi.fn(),
+        setRotation: vi.fn(),
+        setZoom: vi.fn(),
+        unloadImage: vi.fn(),
+        notifyCropRegionChanged: vi.fn(),
+        getMaxEditorZoom: vi.fn(),
+        applyEditorZoom: vi.fn(),
+      } as never,
+      gbController: {
+        buildOutput: vi.fn(),
+        refreshVisuals: vi.fn(),
+        setRotation: vi.fn(),
+        setZoom: vi.fn(),
+        unloadGb: vi.fn(),
+      } as never,
+    });
+    staleController.downloadPxc();
+    expect(downloadSpy).not.toHaveBeenCalled();
+
+    // Positive control: lastIndexedPixels has correct size for default X4 device (480×800)
+    downloadSpy.mockClear();
+    const validController = createAppController({
+      store: createMockStore({ ...initialAppState, loadedType: 'image' }),
+      workCanvas: { width: 0, height: 0 } as never,
+      previewCanvas: { width: 0, height: 0 } as never,
+      imageRuntime: { loadedImg: {}, lastIndexedPixels: new Uint8Array(480 * 800) } as never,
+      gbRuntime: { pixels: null } as never,
+      output: { pxcBytes: null, bmpBytes: null },
+      imageController: {
+        resetEditor: vi.fn(),
+        requestConvert: vi.fn(),
+        setRotation: vi.fn(),
+        setZoom: vi.fn(),
+        unloadImage: vi.fn(),
+        notifyCropRegionChanged: vi.fn(),
+        getMaxEditorZoom: vi.fn(),
+        applyEditorZoom: vi.fn(),
+      } as never,
+      gbController: {
+        buildOutput: vi.fn(),
+        refreshVisuals: vi.fn(),
+        setRotation: vi.fn(),
+        setZoom: vi.fn(),
+        unloadGb: vi.fn(),
+      } as never,
+    });
+    validController.downloadPxc();
+    expect(downloadSpy).toHaveBeenCalledOnce();
+  });
+
   it('guards downloads until both output byte buffers exist (gb path)', () => {
     const { controller, output } = createController({
       ...initialAppState,

@@ -151,6 +151,7 @@ setupPreviewZoom({
   previewCanvas,
   zoomBox,
   zoomCanvas,
+  zoomLabel: dom.zoomLabel,
 });
 
 bindRotationControls({

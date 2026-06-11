@@ -128,6 +128,16 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (!isCurrentSession(inFlightProcessSession)) return;
 
     const state = getState();
+
+    // A device switch landed while this job was in flight: the buffer is sized for the old
+    // device. Drop the paint, but release the single-flight gate so the re-convert that the
+    // device change already queued (via processRequested) can run.
+    if (result.indexedPixels.byteLength !== state.device.totalPixels) {
+      processing = false;
+      if (processRequested) scheduleNextConvert();
+      return;
+    }
+
     deps.runtime.lastIndexedPixels = new Uint8Array(result.indexedPixels);
     deps.runtime.lastHistogram = new Float32Array(result.histogram);
 
@@ -421,28 +431,35 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   async function autoLevels(): Promise<void> {
     if (!deps.runtime.loadedImg) return;
 
-    const state = getState();
     const sessionVersion = deps.runtime.sessionVersion;
     const gen = ++deps.runtime.autoLevelsGen;
-    const src = getActiveSource();
-    const tempCanvas = createCanvas(state.device.targetW, state.device.targetH);
-    const plan = currentRenderPlan(srcW(src), srcH(src));
+    try {
+      const state = getState();
+      const src = getActiveSource();
+      const tempCanvas = createCanvas(state.device.targetW, state.device.targetH);
+      const plan = currentRenderPlan(srcW(src), srcH(src));
 
-    await renderImageBaseRaster({
-      src,
-      targetCanvas: tempCanvas,
-      plan,
-      fitBg: state.background,
-      pica: deps.pica,
-    });
-    if (gen !== deps.runtime.autoLevelsGen || !isCurrentSession(sessionVersion)) return;
+      await renderImageBaseRaster({
+        src,
+        targetCanvas: tempCanvas,
+        plan,
+        fitBg: state.background,
+        pica: deps.pica,
+      });
+      if (gen !== deps.runtime.autoLevelsGen || !isCurrentSession(sessionVersion)) return;
 
-    const region = getImageAnalysisRegion(plan);
-    const px = getContext2d(tempCanvas).getImageData(region.x, region.y, region.width, region.height).data;
-    const levels = computeAutoLevels(buildUintHistogram(buildLuminanceBuffer(px)), region.pixelCount);
+      const region = getImageAnalysisRegion(plan);
+      const px = getContext2d(tempCanvas).getImageData(region.x, region.y, region.width, region.height).data;
+      const levels = computeAutoLevels(buildUintHistogram(buildLuminanceBuffer(px)), region.pixelCount);
 
-    deps.store.dispatch(actions.imageApplyAutoLevels(levels.blackPoint, levels.whitePoint, 1.0));
-    requestConvert();
+      deps.store.dispatch(actions.imageApplyAutoLevels(levels.blackPoint, levels.whitePoint, 1.0));
+      requestConvert();
+    } catch (error) {
+      // Surfacing only; unlike convert() there is no gate to reset. Stale failures
+      // (superseded generation or torn-down session) are irrelevant.
+      if (gen !== deps.runtime.autoLevelsGen || !isCurrentSession(sessionVersion)) return;
+      deps.host.showError(error instanceof Error ? error.message : 'Auto levels failed.');
+    }
   }
 
   function notifyCropRegionChanged(): void {

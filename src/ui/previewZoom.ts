@@ -6,12 +6,15 @@ type PreviewZoomDeps = {
   previewCanvas: HTMLCanvasElement;
   zoomBox: HTMLDivElement;
   zoomCanvas: HTMLCanvasElement;
+  zoomLabel: HTMLSpanElement;
 };
 
 const ZOOM_BOX_SIZE = 260;
 const ZOOM_SOURCE_SIZE = 72;
 
 export function setupPreviewZoom(deps: PreviewZoomDeps): void {
+  deps.zoomLabel.textContent = `${(ZOOM_BOX_SIZE / ZOOM_SOURCE_SIZE).toFixed(1)}× zoom`;
+
   deps.previewCanvas.addEventListener('mouseenter', () => {
     if (deps.store.getState().output.pxcReady) deps.zoomBox.style.display = 'block';
   });

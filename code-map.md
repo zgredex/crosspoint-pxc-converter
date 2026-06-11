@@ -175,7 +175,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/domain/gb/parsePrinterTxt.ts` | domain | Parse GB Printer text logs | `parsePrinterTxt` |
 | `src/domain/gb/rotatePixels.ts` | domain | Rotate flat pixel buffer | `rotatePixels` |
 | `src/domain/gb/constants.ts` | domain | Tile / palette constants | constants |
-| `src/domain/gb/displayScale.ts` | domain | GB display-scale math (default scale clamp from rotated dims) | `computeGbDisplayScale` |
+| `src/domain/gb/displayScale.ts` | domain | GB display-scale math (default scale clamp from rotated dims; max-output-scale clamp per device) | `computeGbDisplayScale`, `computeMaxGbOutputScale` |
 | `src/infra/browser/imageLoader.ts` | infra | File → DataURL / ArrayBuffer / text / Image | `readFile*`, `loadImageFromDataUrl` |
 | `src/infra/browser/downloads.ts` | infra | Trigger blob download | `triggerDownload` |
 | `src/infra/browser/clipboard.ts` | infra | Read image from clipboard | clipboard helpers |
@@ -392,6 +392,7 @@ Before writing X, use Y:
 | Bind a slider/pill to the store | `bindStoreControls` | `ui/bindings.ts` |
 | Show a status banner | `showError` / `clearStatus` | `app/messages.ts` |
 | Validate GB bytes | `validateGbBytes` | `app/validation.ts` |
+| Clamp/compute the max integer GB output scale for a device | `computeMaxGbOutputScale` | `domain/gb/displayScale.ts` |
 
 ---
 
