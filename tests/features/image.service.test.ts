@@ -4,6 +4,7 @@ import { buildLuminanceBuffer } from '../../src/domain/tone';
 import { ditherToIndexedGray } from '../../src/domain/dither';
 import { buildHistogram } from '../../src/domain/histogram';
 import { encodePxc } from '../../src/domain/formats/pxc';
+import { getQuantProfile } from '../../src/domain/quantize';
 
 describe('image processing pipeline', () => {
   it('builds luminance, dithers, histograms, and encodes pxc from rgba input', () => {
@@ -14,7 +15,7 @@ describe('image processing pipeline', () => {
 
     const buffer = buildLuminanceBuffer(rgba);
     const histogram = buildHistogram(buffer);
-    const indexedPixels = ditherToIndexedGray(buffer, 2, 1, false, 'fs', [42, 127, 212]);
+    const indexedPixels = ditherToIndexedGray(buffer, 2, 1, false, 'fs', getQuantProfile('pr1614'));
     const pxcBytes = encodePxc(indexedPixels, 2, 1);
 
     expect(histogram[0]).toBe(1);

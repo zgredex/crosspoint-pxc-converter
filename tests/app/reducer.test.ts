@@ -115,10 +115,10 @@ describe('app reducer', () => {
   });
 
   it('switches the quant preset', () => {
-    expect(initialAppState.quantPreset).toBe('pr1614');
-    const next = reducer(initialAppState, actions.setQuantPreset('master'));
-    expect(next.quantPreset).toBe('master');
-    expect(reducer(next, actions.setQuantPreset('pr1614')).quantPreset).toBe('pr1614');
+    expect(initialAppState.quantPreset).toBe('master');
+    const next = reducer(initialAppState, actions.setQuantPreset('pr1614'));
+    expect(next.quantPreset).toBe('pr1614');
+    expect(reducer(next, actions.setQuantPreset('master')).quantPreset).toBe('master');
   });
 
   it('stores and clears UI status messages', () => {

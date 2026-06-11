@@ -79,7 +79,7 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | Auto-levels analysis | `domain/tone.ts:computeAutoLevels` over `buildLuminanceBuffer` + `buildUintHistogram` |
 | Worker process protocol | Types in `infra/worker/workerProtocol.ts`; worker `infra/worker/imageWorker.ts` ↔ host `infra/worker/imageWorkerClient.ts` |
 | GB display-scale math (default scale, zoom clamp) | `domain/gb/displayScale.ts:computeGbDisplayScale` (used by `features/gb/service.ts:buildGbSourceView` and `ui/render.ts`) |
-| Quantization thresholds per preset | `domain/quantize.ts:getQuantThresholds(preset)` — the active preset is `state.quantPreset` (default `pr1614`; hidden Ctrl+Shift+Q toggle persists to localStorage). The worker receives the preset via `WorkerSettings`; histogram zones/markers take the threshold triple as a parameter. Never hardcode `42/127/212`. |
+| Quantization profile per preset | `domain/quantize.ts:getQuantProfile(preset)` — `thresholds` = dither-off hard quantize (firmware quantizeSimple); `ditherThresholds`/`ditherLevels` = error-diffusion calibration (master mirrors the firmware's X4-tuned Atkinson/FS branch in `crosspoint-reader` BitmapHelpers.h: bins 30/50/140, perceived levels 15/30/80/210). Histogram zones/markers use `getQuantThresholds` (the hard triple). Never hardcode any of these. |
 | Rotated source dims + max fit-size percent under no-upscale | `domain/geometry.ts:rotatedSourceDims` + `computeMaxFitSizePct` (used by `ui/render.ts`, `ui/bindings.ts`, `ui/imageCropBridge.ts`) |
 
 ---
@@ -164,9 +164,9 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/domain/geometry.ts` | domain | Editor scales + unified render plan + crop-box clamp + rotated-dims/fit-pct helpers | `computeEditorGeometry`, `buildImageRenderPlan`, `clampBoxToSource`, `clampBoxToDevice`, `clampBoxForMode`, `getImageAnalysisRegion`, `fitOffset`, `rotatedSourceDims`, `computeMaxFitSizePct`, `rotateBoxRect` |
 | `src/domain/tone.ts` | domain | Tone LUT + luminance + auto-levels | `buildToneLut`, `buildLuminanceBuffer`, `computeAutoLevels` |
 | `src/domain/histogram.ts` | domain | Histograms (Float32, Uint) | `buildHistogram`, `buildUintHistogram` |
-| `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise` | `ditherToIndexedGray`, `DitherMode`, `DITHER_FILENAME_SUFFIX` |
+| `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise`. `ditherToIndexedGray` takes a `QuantProfile` (not bare thresholds) | `ditherToIndexedGray`, `DitherMode`, `DITHER_FILENAME_SUFFIX` |
 | `src/domain/blueNoise.ts` | domain | Pre-computed blue-noise threshold matrix | (matrix data) |
-| `src/domain/quantize.ts` | domain | 4-level quantization against explicit per-preset thresholds (`pr1614` default vs `master`); pure — the active preset lives in `state.quantPreset` | `quantize`, `getQuantThresholds`, `GRAY_DISP`, `QuantPreset`, `QuantThresholds`, `DEFAULT_QUANT_PRESET`, `QUANT_PRESET_LABELS` |
+| `src/domain/quantize.ts` | domain | 4-level quantization against explicit per-preset profiles (`master` default vs `pr1614`); pure — the active preset lives in `state.quantPreset` | `quantize`, `getQuantThresholds`, `getQuantProfile`, `GRAY_DISP`, `QuantPreset`, `QuantThresholds`, `QuantProfile`, `QuantLevels`, `DEFAULT_QUANT_PRESET`, `QUANT_PRESET_LABELS` |
 | `src/domain/devices.ts` | domain | XTeink device specs | `DEVICES`, `DEFAULT_XT`, `DeviceKey` |
 | `src/domain/formats/pxc.ts` | domain | `.pxc` encoder | `encodePxc` |
 | `src/domain/formats/bmpGray.ts` | domain | 8-bit grayscale BMP encoder | `encodeGrayBmp` |
@@ -374,8 +374,8 @@ Before writing X, use Y:
 | Resize a canvas before output | `stepDownscaleAndResize` | `infra/canvas/picaResize.ts` |
 | Apply tone (gamma/black/white/contrast/invert) | `buildToneLut` | `domain/tone.ts` — never per-pixel branches |
 | Auto-detect black/white points | `computeAutoLevels` (over `buildLuminanceBuffer` + `buildUintHistogram`) | `domain/tone.ts` |
-| Dither a Float32 buffer to 4-level indexed | `ditherToIndexedGray` (mode picked from `DitherMode` union — see `domain/dither.ts` for the eight supported modes; takes the quant-threshold triple) | `domain/dither.ts` |
-| Get quantization thresholds for a preset | `getQuantThresholds(state.quantPreset)` | `domain/quantize.ts` |
+| Dither a Float32 buffer to 4-level indexed | `ditherToIndexedGray` (mode picked from `DitherMode` union — see `domain/dither.ts` for the eight supported modes; takes a `QuantProfile`) | `domain/dither.ts` |
+| Get quantization thresholds for a preset | `getQuantThresholds(state.quantPreset)` (hard triple for histogram zones/markers); `getQuantProfile(state.quantPreset)` for dithering | `domain/quantize.ts` |
 | Compute rotated source dims / max fit-size % | `rotatedSourceDims` / `computeMaxFitSizePct` | `domain/geometry.ts` |
 | Rotate a crop-box rect with the content (display coords) | `rotateBoxRect` | `domain/geometry.ts` |
 | Build a histogram | `buildHistogram` (Float32) / `buildUintHistogram` (luminance Uint8) | `domain/histogram.ts` |

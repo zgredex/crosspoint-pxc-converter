@@ -108,7 +108,7 @@ Controls run in this processing order: black/white-point map → gamma → contr
 
 ### Dithering
 
-Every error-diffusion algorithm uses BT.601 luminance in sRGB space and quantises against the palette `[0, 85, 170, 255]`, matching ImageMagick's `-colorspace Gray` pipeline.
+Every error-diffusion algorithm uses BT.601 luminance in sRGB space and quantises against the X4 e-ink panel's calibrated response — bins `30 / 50 / 140` with perceived levels `[15, 30, 80, 210]` — matching the CrossPoint firmware's own image pipeline, so the dithered pattern reads at the source's brightness on the physical display.
 
 | Algorithm | Notes |
 |-----------|-------|
@@ -130,7 +130,7 @@ A live tone-distribution panel renders alongside the preview:
 - 256-bin luminance histogram of the post-tone pre-dither buffer.
 - Four coloured zones corresponding to the four output levels, each labelled with the percentage of pixels that fall into it.
 - A solid palette colour strip below for unambiguous level identification.
-- Threshold markers drawn at 42, 127, and 212 — the boundaries between adjacent output levels.
+- Threshold markers drawn at 45, 70, and 140 — the boundaries between adjacent output levels.
 
 ### Game Boy mode
 

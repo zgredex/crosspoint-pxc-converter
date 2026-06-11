@@ -1,4 +1,4 @@
-import { GRAY_DISP, quantize, type QuantThresholds } from './quantize';
+import { quantize, type QuantProfile } from './quantize';
 import { BLUE_NOISE_64 } from './blueNoise';
 
 export type DitherMode = 'fs' | 'atk' | 'jjn' | 'stucki' | 'burkes' | 'bayer' | 'zhou-fang' | 'blue-noise';
@@ -100,19 +100,20 @@ export function ditherToIndexedGray(
   height: number,
   enabled: boolean,
   mode: DitherMode,
-  thresholds: QuantThresholds,
+  profile: QuantProfile,
 ): Uint8Array {
   const q = new Uint8Array(width * height);
   const buf = new Float32Array(source);
 
   if (!enabled) {
     for (let i = 0; i < width * height; i++) {
-      q[i] = quantize(Math.max(0, Math.min(255, buf[i])), thresholds);
+      q[i] = quantize(Math.max(0, Math.min(255, buf[i])), profile.thresholds);
     }
     return q;
   }
 
   if (mode === 'bayer' || mode === 'blue-noise') {
+    const levels = profile.ditherLevels;
     const threshold =
       mode === 'bayer'
         ? (_x: number, y: number, x: number) => ([0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5][(y & 3) * 4 + (x & 3)] + 0.5) / 16
@@ -124,13 +125,13 @@ export function ditherToIndexedGray(
         const t = threshold(i, y, x);
         let lo = 0;
         for (let k = 2; k >= 0; k--) {
-          if (v >= GRAY_DISP[k]) {
+          if (v >= levels[k]) {
             lo = k;
             break;
           }
         }
         const hi = Math.min(lo + 1, 3);
-        const frac = lo === hi ? 1 : (v - GRAY_DISP[lo]) / (GRAY_DISP[hi] - GRAY_DISP[lo]);
+        const frac = lo === hi ? 1 : (v - levels[lo]) / (levels[hi] - levels[lo] || 1);
         q[i] = frac > t ? hi : lo;
       }
     }
@@ -138,6 +139,7 @@ export function ditherToIndexedGray(
   }
 
   if (mode === 'zhou-fang') {
+    const levels = profile.ditherLevels;
     for (let y = 0; y < height; y++) {
       const ltr = (y & 1) === 0;
       const d = ltr ? 1 : -1;
@@ -149,21 +151,21 @@ export function ditherToIndexedGray(
 
         let lo = 0;
         for (let k = 2; k >= 0; k--) {
-          if (v >= GRAY_DISP[k]) {
+          if (v >= levels[k]) {
             lo = k;
             break;
           }
         }
         const hi = Math.min(lo + 1, 3);
-        const span = GRAY_DISP[hi] - GRAY_DISP[lo] || 1;
-        const frac = (v - GRAY_DISP[lo]) / span;
+        const span = levels[hi] - levels[lo] || 1;
+        const frac = (v - levels[lo]) / span;
 
         const r = Math.random();
         const thr = 0.5 + (r % 0.5) * ZF_MOD[idx];
         const qv = frac >= thr ? hi : lo;
         q[i] = qv;
 
-        const e = v - GRAY_DISP[qv];
+        const e = v - levels[qv];
         const cBase = idx * 3;
         const cR = ZF_COEFFS[cBase];
         const cBL = ZF_COEFFS[cBase + 1];
@@ -183,9 +185,9 @@ export function ditherToIndexedGray(
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       const v = Math.max(0, Math.min(255, buf[i]));
-      const qv = quantize(v, thresholds);
+      const qv = quantize(v, profile.ditherThresholds);
       q[i] = qv;
-      const e = v - GRAY_DISP[qv];
+      const e = v - profile.ditherLevels[qv];
 
       switch (mode) {
         case 'atk': {

@@ -1,6 +1,6 @@
 import { ditherToIndexedGray } from '../../domain/dither';
 import { buildHistogram } from '../../domain/histogram';
-import { getQuantThresholds } from '../../domain/quantize';
+import { getQuantProfile } from '../../domain/quantize';
 import { buildToneLut } from '../../domain/tone';
 import type { WorkerInMessage, WorkerOutMessage } from './workerProtocol';
 
@@ -52,7 +52,7 @@ function processMessage(e: MessageEvent<WorkerInMessage>): void {
         baseHeight,
         settings.ditherEnabled,
         settings.ditherMode,
-        getQuantThresholds(settings.quantPreset),
+        getQuantProfile(settings.quantPreset),
       );
 
       const response: WorkerOutMessage = {
