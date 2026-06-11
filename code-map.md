@@ -129,13 +129,13 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 
 - **All app state** flows through `actions` + `reducer`. Components subscribe via `store.subscribe(render)`. Never mutate `state` directly.
 - **All large mutable objects** (canvases, timers, indexed pixel buffers, base-raster buffers, generation counters, raw GB bytes, decoded pixel arrays, encoded output byte buffers) live in `app/runtime/{image,gb,output}Runtime.ts`. They are *not* in the store.
-- **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Drag handlers may move `boxX/boxY` through `setBoxPosition` and resize handlers may move `boxW/boxH` through `setBoxSize` — both scoped to crop-interaction gestures. One blessed exception outside gestures: `toggleMirrorH/V` reflect `boxX`/`boxY` through `setBoxPosition` immediately before `dispatchAndRetransform` re-runs `applyGeometry`, so the mirrored position feeds the prev-center math and the box stays over the same source content. Don't write to these fields anywhere else.
+- **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Drag handlers may move `boxX/boxY` through `setBoxPosition` and resize handlers may move `boxW/boxH` through `setBoxSize` — both scoped to crop-interaction gestures. Two blessed exceptions outside gestures: `toggleMirrorH/V` reflect `boxX`/`boxY` through `setBoxPosition`, and `setRotation` rotates the rect through `setBoxSize`+`setBoxPosition` (via `domain/geometry.ts:rotateBoxRect`) — both immediately before `dispatchAndRetransform` re-runs `applyGeometry`, so the transformed position feeds the prev-center math and the box stays over the same source content. Don't write to these fields anywhere else.
 - **`runtime.cachedBaseRaster` / `sharedBufferVersion`** are written only by `convert` (image controller). Cleared by `unloadImage`. Invalidated for next `convert` (forces a pica rebuild) only via `invalidateBaseRaster()` — currently called from `ui/bindings.ts` (fit-position change) and `appController.handleBackgroundChange`.
 - **`output.{pxcBytes,bmpBytes}`** are written only via `setOutputBytes` / `clearOutputBytes` from `outputRuntime.ts` — and only by the GB controller (the image path encodes lazily on download).
 
 ### Store conventions
 
-- **Action naming.** `<feature>Set<Field>` for value setters (`imageSetBlackPoint`, `gbSetPalette`), `<feature>Toggle<Field>` for booleans (`imageToggleAspectRatioLock`), `<feature>Reset<Scope>` for grouped resets. Top-level state slices (`device`, `output`, `ui`) follow the same rule with their slice name as prefix.
+- **Action naming.** `<feature>Set<Field>` for value setters (`imageSetBlackPoint`, `gbSetPalette`), `<feature>Toggle<Field>` for booleans (`imageToggleMirrorH`), `<feature>Reset<Scope>` for grouped resets. Top-level state slices (`device`, `output`, `ui`) follow the same rule with their slice name as prefix.
 - **Reducer is pure.** No `dispatch`, no `fetch`/promises, no timers. Validation/clamping inside cases is fine (e.g., black-point clamp). Anything that touches the runtime (canvases, workers, IO, rAF) lives in a controller, never in the reducer.
 - **No selectors in the reducer.** Computed-from-state values (e.g., display labels, derived geometry) are computed in feature controllers or in `ui/render.ts`. The reducer's job is to apply the action and return new state.
 - **Single writer per runtime field.** Section 5 above lists each runtime field and its sole writer; preserve that invariant when adding new mutable state.
@@ -161,7 +161,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/app/runtime/imageRuntime.ts` | app | Mutable image-pipeline state (canvases, scales, box, caches, timers, versions) | `ImageRuntime`, `createImageRuntime` |
 | `src/app/runtime/gbRuntime.ts` | app | Mutable GB state (raw bytes, decoded pixels, palette remap) | `GbRuntime`, `createGbRuntime` |
 | `src/app/runtime/outputRuntime.ts` | app | Encoded output bytes | `OutputRuntime`, `createOutputRuntime`, `setOutputBytes`, `clearOutputBytes`, `hasOutput` |
-| `src/domain/geometry.ts` | domain | Editor scales + unified render plan + crop-box clamp + rotated-dims/fit-pct helpers | `computeEditorGeometry`, `buildImageRenderPlan`, `clampBoxToSource`, `clampBoxToDevice`, `clampBoxForMode`, `getImageAnalysisRegion`, `fitOffset`, `rotatedSourceDims`, `computeMaxFitSizePct` |
+| `src/domain/geometry.ts` | domain | Editor scales + unified render plan + crop-box clamp + rotated-dims/fit-pct helpers | `computeEditorGeometry`, `buildImageRenderPlan`, `clampBoxToSource`, `clampBoxToDevice`, `clampBoxForMode`, `getImageAnalysisRegion`, `fitOffset`, `rotatedSourceDims`, `computeMaxFitSizePct`, `rotateBoxRect` |
 | `src/domain/tone.ts` | domain | Tone LUT + luminance + auto-levels | `buildToneLut`, `buildLuminanceBuffer`, `computeAutoLevels` |
 | `src/domain/histogram.ts` | domain | Histograms (Float32, Uint) | `buildHistogram`, `buildUintHistogram` |
 | `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise` | `ditherToIndexedGray`, `DitherMode`, `DITHER_FILENAME_SUFFIX` |
@@ -377,6 +377,7 @@ Before writing X, use Y:
 | Dither a Float32 buffer to 4-level indexed | `ditherToIndexedGray` (mode picked from `DitherMode` union — see `domain/dither.ts` for the eight supported modes; takes the quant-threshold triple) | `domain/dither.ts` |
 | Get quantization thresholds for a preset | `getQuantThresholds(state.quantPreset)` | `domain/quantize.ts` |
 | Compute rotated source dims / max fit-size % | `rotatedSourceDims` / `computeMaxFitSizePct` | `domain/geometry.ts` |
+| Rotate a crop-box rect with the content (display coords) | `rotateBoxRect` | `domain/geometry.ts` |
 | Build a histogram | `buildHistogram` (Float32) / `buildUintHistogram` (luminance Uint8) | `domain/histogram.ts` |
 | Draw a histogram | `renderHistogram` | `infra/canvas/histogramRenderer.ts` |
 | Paint indexed-pixel preview | `renderIndexedPreview` | `infra/canvas/previewRenderer.ts` |

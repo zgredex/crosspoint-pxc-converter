@@ -64,6 +64,24 @@ export function rotatedSourceDims(width: number, height: number, rotation: numbe
   return rotation % 180 === 0 ? { w: width, h: height } : { w: height, h: width };
 }
 
+// Transform a crop-box rect through a rotation delta, in editor display coords.
+// dispW/dispH are the pre-rotation displayed image dims. Display scale is uniform on
+// both axes, so the transformed rect divided by the old scale yields the correct
+// source-space placement in the rotated frame.
+export function rotateBoxRect(
+  box: { x: number; y: number; w: number; h: number },
+  dispW: number,
+  dispH: number,
+  deltaDeg: number,
+): { x: number; y: number; w: number; h: number } {
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  if (deltaDeg === 90) return { x: (dispH - cy) - box.h / 2, y: cx - box.w / 2, w: box.h, h: box.w };
+  if (deltaDeg === 180) return { x: (dispW - cx) - box.w / 2, y: (dispH - cy) - box.h / 2, w: box.w, h: box.h };
+  if (deltaDeg === 270) return { x: cy - box.h / 2, y: (dispW - cx) - box.w / 2, w: box.h, h: box.w };
+  return { ...box };
+}
+
 // Largest fit-size percent that doesn't upscale the source. When the source already fills (or
 // overflows) the device on some axis, full fit is a downscale and the slider's whole 10–100%
 // range applies. The 10% floor matches the reducer's fitSizePct clamp.

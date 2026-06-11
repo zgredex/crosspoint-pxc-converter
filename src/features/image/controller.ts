@@ -7,6 +7,7 @@ import {
   commitBaseRaster,
   commitGeometry,
   setBoxPosition,
+  setBoxSize,
 } from '../../app/runtime/imageRuntime';
 import type { AppStore } from '../../app/store';
 import type { ControllerHost } from '../../app/controllerHost';
@@ -21,6 +22,7 @@ import {
   clampBoxToDevice,
   computeEditorGeometry,
   getImageAnalysisRegion,
+  rotateBoxRect,
   type EditorGeometry,
   type ImageRenderPlan,
 } from '../../domain/geometry';
@@ -177,6 +179,20 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
   function setRotation(rotation: Rotation): void {
     notifyCropRegionChanged();
+    // Rotate the crop box with the content (display coords, pre-dispatch) so applyGeometry's
+    // prev-center math lands the selection on the same source content — the same pattern the
+    // mirror toggles use with a reflection.
+    if (deps.runtime.loadedImg && deps.runtime.dispImgW > 0 && deps.runtime.dispImgH > 0) {
+      const delta = (rotation - getState().image.rotation + 360) % 360;
+      const rotated = rotateBoxRect(
+        { x: deps.runtime.boxX, y: deps.runtime.boxY, w: deps.runtime.boxW, h: deps.runtime.boxH },
+        deps.runtime.dispImgW,
+        deps.runtime.dispImgH,
+        delta,
+      );
+      setBoxSize(deps.runtime, rotated.w, rotated.h);
+      setBoxPosition(deps.runtime, rotated.x, rotated.y);
+    }
     dispatchAndRetransform(actions.imageSetRotation(rotation));
   }
 

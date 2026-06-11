@@ -28,6 +28,20 @@ export function bindFileInput(deps: FileInputDeps): void {
     if (file) void loadFile(file);
   });
 
+  // Without a document-level guard, dropping a file outside the drop zone (which is hidden
+  // whenever something is loaded) navigates the tab to the file, destroying the session.
+  // The drop-zone handlers run first and call preventDefault, so `defaultPrevented` marks
+  // drops already consumed there.
+  document.addEventListener('dragover', event => {
+    event.preventDefault();
+  });
+  document.addEventListener('drop', event => {
+    if (event.defaultPrevented) return;
+    event.preventDefault();
+    const file = event.dataTransfer?.files[0];
+    if (file) void loadFile(file);
+  });
+
   document.addEventListener('paste', event => {
     const file = getPastedImageFile(event);
     if (file) {

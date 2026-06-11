@@ -8,6 +8,7 @@ import {
   fitOffset,
   getImageAnalysisRegion,
   rotatedSourceDims,
+  rotateBoxRect,
 } from '../../src/domain/geometry';
 
 describe('fitOffset', () => {
@@ -353,5 +354,44 @@ describe('clampBoxToDevice', () => {
 
   it('floors at the usability minimum', () => {
     expect(clampBoxToDevice({ ...PARAMS, srcW: 1, srcH: 1 })).toEqual({ srcW: 8, srcH: 8 });
+  });
+});
+
+describe('rotateBoxRect', () => {
+  // box {x:20, y:10, w:40, h:30} in 200×100 display
+  // center = (40, 25)
+  const BOX = { x: 20, y: 10, w: 40, h: 30 };
+  const DISP_W = 200;
+  const DISP_H = 100;
+
+  it('90°: rotates center (40,25) → (75,40) and swaps dims', () => {
+    // 90° cw: new cx = dispH - cy = 100 - 25 = 75; new cy = cx = 40; dims swap (30,40)
+    expect(rotateBoxRect(BOX, DISP_W, DISP_H, 90)).toEqual({ x: 60, y: 20, w: 30, h: 40 });
+  });
+
+  it('180°: rotates center (40,25) → (160,75), dims unchanged', () => {
+    // 180°: new cx = dispW - cx = 200 - 40 = 160; new cy = dispH - cy = 100 - 25 = 75
+    expect(rotateBoxRect(BOX, DISP_W, DISP_H, 180)).toEqual({ x: 140, y: 60, w: 40, h: 30 });
+  });
+
+  it('270°: rotates center (40,25) → (25,160) and swaps dims', () => {
+    // 270° cw: new cx = cy = 25; new cy = dispW - cx = 200 - 40 = 160; dims swap (30,40)
+    expect(rotateBoxRect(BOX, DISP_W, DISP_H, 270)).toEqual({ x: 10, y: 140, w: 30, h: 40 });
+  });
+
+  it('0°: returns the box unchanged', () => {
+    expect(rotateBoxRect(BOX, DISP_W, DISP_H, 0)).toEqual(BOX);
+  });
+
+  it('round-trip: four 90° rotations return the original rect (display dims swap each step)', () => {
+    // After each 90° rotation, dispW and dispH swap (landscape→portrait→landscape→portrait→landscape)
+    let box = { ...BOX };
+    let dw = DISP_W; // 200
+    let dh = DISP_H; // 100
+    for (let i = 0; i < 4; i++) {
+      box = rotateBoxRect(box, dw, dh, 90);
+      [dw, dh] = [dh, dw];
+    }
+    expect(box).toEqual(BOX);
   });
 });
