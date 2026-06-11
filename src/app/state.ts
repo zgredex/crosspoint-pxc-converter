@@ -2,6 +2,7 @@ import { DEFAULT_XT, DEVICES, type DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { FitAlign } from '../domain/geometry';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
+import { DEFAULT_QUANT_PRESET, type QuantPreset } from '../domain/quantize';
 
 export type LoadedType = 'image' | 'gb' | null;
 export type FitBackground = 'white' | 'black';
@@ -77,6 +78,7 @@ export type AppState = {
   loadedType: LoadedType;
   device: DeviceState;
   background: FitBackground;
+  quantPreset: QuantPreset;
   image: ImageState;
   gb: GbState;
   output: OutputState;
@@ -138,6 +140,7 @@ export const initialAppState: AppState = {
   loadedType: null,
   device: createDeviceState(DEFAULT_XT),
   background: 'white',
+  quantPreset: DEFAULT_QUANT_PRESET,
   image: initialImageState,
   gb: initialGbState,
   output: initialOutputState,

@@ -80,6 +80,7 @@ export function createDom() {
     gbInvertToggle: requiredElement<HTMLInputElement>('gbInvertToggle'),
     zoomBox: requiredElement<HTMLDivElement>('zoomBox'),
     zoomCanvas: requiredElement<HTMLCanvasElement>('zoomCanvas'),
+    quantPresetBadge: requiredElement<HTMLDivElement>('quantPresetBadge'),
     deviceButtons: queryAll<HTMLButtonElement>('[data-xt]'),
     modeButtons: queryAll<HTMLButtonElement>('[data-mode]'),
     ditherButtons: queryAll<HTMLButtonElement>('[data-dither]'),

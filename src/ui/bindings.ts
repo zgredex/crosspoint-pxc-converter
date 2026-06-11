@@ -4,7 +4,7 @@ import type { AppStore } from '../app/store';
 import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
-import type { FitAlign } from '../domain/geometry';
+import { computeMaxFitSizePct, rotatedSourceDims, type FitAlign } from '../domain/geometry';
 import { initialImageState, type FitBackground, type ImageMode } from '../app/state';
 import type { AppDom } from './dom';
 import { isModePillActive } from './render';
@@ -51,15 +51,15 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
       const state = store.getState();
       const dims = state.image.sourceDims;
       if (dims) {
-        const rotated = state.image.rotation === 90 || state.image.rotation === 270;
-        const sW = rotated ? dims.height : dims.width;
-        const sH = rotated ? dims.width : dims.height;
-        const maxFit = Math.min(state.device.targetW / sW, state.device.targetH / sH);
-        if (maxFit > 1) {
-          const maxPct = Math.max(10, Math.floor(100 / maxFit));
-          if (state.image.fitSizePct > maxPct) {
-            store.dispatch(actions.imageSetFitSizePct(maxPct));
-          }
+        const rotated = rotatedSourceDims(dims.width, dims.height, state.image.rotation);
+        const maxPct = computeMaxFitSizePct({
+          sourceW: rotated.w,
+          sourceH: rotated.h,
+          targetW: state.device.targetW,
+          targetH: state.device.targetH,
+        });
+        if (state.image.fitSizePct > maxPct) {
+          store.dispatch(actions.imageSetFitSizePct(maxPct));
         }
       }
     }

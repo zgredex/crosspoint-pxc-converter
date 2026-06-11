@@ -1,4 +1,4 @@
-import { GRAY_DISP, quantize } from './quantize';
+import { GRAY_DISP, quantize, type QuantThresholds } from './quantize';
 import { BLUE_NOISE_64 } from './blueNoise';
 
 export type DitherMode = 'fs' | 'atk' | 'jjn' | 'stucki' | 'burkes' | 'bayer' | 'zhou-fang' | 'blue-noise';
@@ -100,13 +100,14 @@ export function ditherToIndexedGray(
   height: number,
   enabled: boolean,
   mode: DitherMode,
+  thresholds: QuantThresholds,
 ): Uint8Array {
   const q = new Uint8Array(width * height);
   const buf = new Float32Array(source);
 
   if (!enabled) {
     for (let i = 0; i < width * height; i++) {
-      q[i] = quantize(Math.max(0, Math.min(255, buf[i])));
+      q[i] = quantize(Math.max(0, Math.min(255, buf[i])), thresholds);
     }
     return q;
   }
@@ -182,7 +183,7 @@ export function ditherToIndexedGray(
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       const v = Math.max(0, Math.min(255, buf[i]));
-      const qv = quantize(v);
+      const qv = quantize(v, thresholds);
       q[i] = qv;
       const e = v - GRAY_DISP[qv];
 

@@ -41,10 +41,8 @@ function createController(state = initialAppState) {
 
   const controller = createAppController({
     store,
-    dom: {
-      workCanvas: { width: 0, height: 0 },
-      previewCanvas: { width: 0, height: 0 },
-    } as never,
+    workCanvas: { width: 0, height: 0 } as never,
+    previewCanvas: { width: 0, height: 0 } as never,
     imageRuntime: { loadedImg: null } as never,
     gbRuntime: { pixels: null } as never,
     output,
@@ -81,10 +79,8 @@ describe('appController', () => {
         loadedType: 'image',
         device: { key: 'x3', targetW: 528, targetH: 792, totalPixels: 528 * 792 },
       }),
-      dom: {
-        workCanvas: { width: 0, height: 0 },
-        previewCanvas: { width: 0, height: 0 },
-      } as never,
+      workCanvas: { width: 0, height: 0 } as never,
+      previewCanvas: { width: 0, height: 0 } as never,
       imageRuntime,
       gbRuntime: { pixels: null } as never,
       output: { pxcBytes: null, bmpBytes: null },
@@ -112,10 +108,8 @@ describe('appController', () => {
         ...initialAppState,
         loadedType: 'gb',
       }),
-      dom: {
-        workCanvas: { width: 0, height: 0 },
-        previewCanvas: { width: 0, height: 0 },
-      } as never,
+      workCanvas: { width: 0, height: 0 } as never,
+      previewCanvas: { width: 0, height: 0 } as never,
       imageRuntime: { loadedImg: null } as never,
       gbRuntime: { pixels: new Uint8Array([1]) } as never,
       output: { pxcBytes: null, bmpBytes: null },

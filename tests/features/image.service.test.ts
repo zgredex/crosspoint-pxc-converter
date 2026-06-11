@@ -14,7 +14,7 @@ describe('image processing pipeline', () => {
 
     const buffer = buildLuminanceBuffer(rgba);
     const histogram = buildHistogram(buffer);
-    const indexedPixels = ditherToIndexedGray(buffer, 2, 1, false, 'fs');
+    const indexedPixels = ditherToIndexedGray(buffer, 2, 1, false, 'fs', [42, 127, 212]);
     const pxcBytes = encodePxc(indexedPixels, 2, 1);
 
     expect(histogram[0]).toBe(1);

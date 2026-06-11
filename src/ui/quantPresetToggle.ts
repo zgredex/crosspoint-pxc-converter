@@ -1,4 +1,6 @@
-import { getQuantPreset, setQuantPreset, type QuantPreset } from '../domain/quantize';
+import { DEFAULT_QUANT_PRESET, QUANT_PRESET_LABELS, type QuantPreset } from '../domain/quantize';
+import { actions } from '../app/actions';
+import type { AppStore } from '../app/store';
 
 const STORAGE_KEY = 'quantPreset';
 const VALID: ReadonlyArray<QuantPreset> = ['pr1614', 'master'];
@@ -14,7 +16,7 @@ function loadStoredPreset(): QuantPreset {
   } catch {
     // localStorage unavailable (private mode / SSR) — fall through to default
   }
-  return 'pr1614';
+  return DEFAULT_QUANT_PRESET;
 }
 
 function persistPreset(p: QuantPreset): void {
@@ -26,7 +28,7 @@ function persistPreset(p: QuantPreset): void {
 }
 
 function labelFor(p: QuantPreset): string {
-  return p === 'master' ? 'Quant: crosspoint master' : 'Quant: PR1614 (current)';
+  return `Quant: ${QUANT_PRESET_LABELS[p]}`;
 }
 
 let toastEl: HTMLDivElement | null = null;
@@ -64,12 +66,15 @@ function showToast(message: string): void {
 }
 
 export type InstallQuantPresetToggleDeps = {
+  store: AppStore;
   requestReprocess: () => void;
 };
 
 export function installQuantPresetToggle(deps: InstallQuantPresetToggleDeps): void {
   const initial = loadStoredPreset();
-  setQuantPreset(initial);
+  if (initial !== deps.store.getState().quantPreset) {
+    deps.store.dispatch(actions.setQuantPreset(initial));
+  }
 
   window.addEventListener('keydown', (e) => {
     if (!e.shiftKey) return;
@@ -78,9 +83,9 @@ export function installQuantPresetToggle(deps: InstallQuantPresetToggleDeps): vo
     if (!isQ) return;
     e.preventDefault();
 
-    const current = getQuantPreset();
+    const current = deps.store.getState().quantPreset;
     const next: QuantPreset = current === 'pr1614' ? 'master' : 'pr1614';
-    setQuantPreset(next);
+    deps.store.dispatch(actions.setQuantPreset(next));
     persistPreset(next);
     showToast(labelFor(next));
     deps.requestReprocess();

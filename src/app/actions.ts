@@ -2,15 +2,15 @@ import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { FitAlign } from '../domain/geometry';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
+import type { QuantPreset } from '../domain/quantize';
 import type { FitBackground, GbDims, GbFileInfo, ImageDims, ImageMode, LoadedType, Rotation, UiTone } from './state';
 
 export type AppAction =
   | { type: 'setLoadedType'; loadedType: LoadedType }
   | { type: 'setDevice'; deviceKey: DeviceKey }
   | { type: 'setBackground'; background: FitBackground }
-  | { type: 'image/setMode'; mode: ImageMode }
+  | { type: 'setQuantPreset'; quantPreset: QuantPreset }
   | { type: 'image/setModePreset'; mode: ImageMode; fitLockNative: boolean }
-  | { type: 'image/setFitLockNative'; fitLockNative: boolean }
   | { type: 'image/setFitAlign'; fitAlign: FitAlign }
   | { type: 'image/setContrast'; contrastValue: number }
   | { type: 'image/resetContrast' }
@@ -49,9 +49,8 @@ export const actions = {
   setLoadedType: (loadedType: LoadedType): AppAction => ({ type: 'setLoadedType', loadedType }),
   setDevice: (deviceKey: DeviceKey): AppAction => ({ type: 'setDevice', deviceKey }),
   setBackground: (background: FitBackground): AppAction => ({ type: 'setBackground', background }),
-  imageSetMode: (mode: ImageMode): AppAction => ({ type: 'image/setMode', mode }),
+  setQuantPreset: (quantPreset: QuantPreset): AppAction => ({ type: 'setQuantPreset', quantPreset }),
   imageSetModePreset: (mode: ImageMode, fitLockNative: boolean): AppAction => ({ type: 'image/setModePreset', mode, fitLockNative }),
-  imageSetFitLockNative: (fitLockNative: boolean): AppAction => ({ type: 'image/setFitLockNative', fitLockNative }),
   imageSetFitAlign: (fitAlign: FitAlign): AppAction => ({ type: 'image/setFitAlign', fitAlign }),
   imageSetContrast: (contrastValue: number): AppAction => ({ type: 'image/setContrast', contrastValue }),
   imageResetContrast: (): AppAction => ({ type: 'image/resetContrast' }),

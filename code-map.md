@@ -11,7 +11,7 @@
 A browser-only converter from arbitrary images / Game Boy Printer captures (`.2bpp`, `.bin`, `.gb`, `.txt`) to:
 
 - `.pxc` — XTeink e-paper raster format (4 levels of gray, packed 2bpp).
-- `.bmp` — 8-bit grayscale BMP.
+- `.bmp` — 4-bit indexed grayscale BMP (BMP3, 4-entry palette).
 - `.bmp` — Game Boy palette BMP (when the source is a GB capture).
 
 No backend. No framework. Plain DOM + a hand-rolled flux-style store. The dither/tone pipeline runs in a Web Worker over a SharedArrayBuffer (so COOP/COEP headers are required in production — see `public/_headers`). Pica (Lanczos) is used for high-quality downscaling on the *output* path only.
@@ -32,17 +32,17 @@ domain  ←  infra  ←  app  ←  features  ←  ui
 | `infra/` | Browser/canvas/worker/file-IO adapters. | App logic, store knowledge, business rules. |
 | `app/` | Store, reducer, runtime objects, top-level controllers (orchestration only — wires features together). | Direct DOM event wiring. |
 | `features/{image,gb}/` | Feature controllers + wiring. Mutates feature runtime + DOM through provided refs. | `addEventListener` directly. Cross-feature imports (image must not import from gb and vice versa). |
-| `ui/` | DOM event wiring (`addEventListener`), pure render of state, DOM lookup helpers. | Knowledge of store/runtime. Takes everything via deps callbacks. |
+| `ui/` | DOM event wiring (`addEventListener`), pure render of state, DOM lookup helpers. Receives the store and runtime refs via deps. | Business logic, geometry/scale math, direct runtime-geometry writes outside the documented box-write helpers. |
 
 **Litmus test for each layer:**
 - `domain/` — would this run in node without DOM? If no, wrong layer.
 - `infra/` — does this know about app state or business logic? If yes, wrong layer.
 - `features/` — am I about to call `el.addEventListener(...)`? Stop; bridge through `ui/`. Am I about to import from `ui/`? Stop; the bridge belongs in `ui/`, not here.
-- `ui/` — am I about to read `store.getState()` directly? Stop; take a getter via deps.
+- `ui/` — am I computing geometry, scales, or other derived business values from raw state? Stop; that math belongs in `domain/` (reuse the §3 canonical home). Reading the deps-provided store for renders and no-op guards is fine (§12 mandates the guards live here); dispatching derived geometry (e.g. `imageSetEditorZoom`) directly is not — go through the controller entry points.
 
-**Wiring exception:** `app/bootstrap.ts`, `app/appController.ts`, and `app/loaderRouter.ts` may import feature factories/types to compose the runtime graph — they are the wiring layer, sitting *above* features for composition while still owning the store/runtime contract. The "app must not import from features" reading of the chain applies to non-wiring app modules (`store`, `reducer`, `state`, `actions`, `messages`, `validation`, `sessionReset`, `runtime/*`).
+**Wiring exception:** `app/bootstrap.ts`, `app/appController.ts`, and `app/loaderRouter.ts` may import feature factories/types to compose the runtime graph — they are the wiring layer, sitting *above* features for composition while still owning the store/runtime contract. `bootstrap.ts` alone may additionally import `ui/*` (it composes the DOM bindings); `appController` and `loaderRouter` may not — they take element refs and getters via deps. The "app must not import from features" reading of the chain applies to non-wiring app modules (`store`, `reducer`, `state`, `actions`, `messages`, `validation`, `sessionReset`, `runtime/*`).
 
-**Enforcement.** The chain is enforced by `dependency-cruiser` (config: `.dependency-cruiser.cjs`). It runs as part of `npm run build` and as a standalone `npm run depcheck`. The same wiring exception is encoded as a `pathNot` on the `app-no-features-ui` rule. Add a violation, the build fails — don't downgrade a rule to "warn" to silence it; either fix the import or move the file to the right layer.
+**Enforcement.** The chain is enforced by `dependency-cruiser` (config: `.dependency-cruiser.cjs`). It runs as part of `npm run build` and as a standalone `npm run depcheck`. The wiring exception is encoded as a `pathNot` on the `app-no-features-ui` rule, and the bootstrap-only ui carve-out as the `app-wiring-no-ui` rule. Add a violation, the build fails — don't downgrade a rule to "warn" to silence it; either fix the import or move the file to the right layer.
 
 ---
 
@@ -79,6 +79,8 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | Auto-levels analysis | `domain/tone.ts:computeAutoLevels` over `buildLuminanceBuffer` + `buildUintHistogram` |
 | Worker process protocol | Types in `infra/worker/workerProtocol.ts`; worker `infra/worker/imageWorker.ts` ↔ host `infra/worker/imageWorkerClient.ts` |
 | GB display-scale math (default scale, zoom clamp) | `domain/gb/displayScale.ts:computeGbDisplayScale` (used by `features/gb/service.ts:buildGbSourceView` and `ui/render.ts`) |
+| Quantization thresholds per preset | `domain/quantize.ts:getQuantThresholds(preset)` — the active preset is `state.quantPreset` (default `pr1614`; hidden Ctrl+Shift+Q toggle persists to localStorage). The worker receives the preset via `WorkerSettings`; histogram zones/markers take the threshold triple as a parameter. Never hardcode `42/127/212`. |
+| Rotated source dims + max fit-size percent under no-upscale | `domain/geometry.ts:rotatedSourceDims` + `computeMaxFitSizePct` (used by `ui/render.ts`, `ui/bindings.ts`, `ui/imageCropBridge.ts`) |
 
 ---
 
@@ -127,7 +129,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 
 - **All app state** flows through `actions` + `reducer`. Components subscribe via `store.subscribe(render)`. Never mutate `state` directly.
 - **All large mutable objects** (canvases, timers, indexed pixel buffers, base-raster buffers, generation counters, raw GB bytes, decoded pixel arrays, encoded output byte buffers) live in `app/runtime/{image,gb,output}Runtime.ts`. They are *not* in the store.
-- **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Drag handlers may move `boxX/boxY` through `setBoxPosition` and resize handlers may move `boxW/boxH` through `setBoxSize` — those are the only other writers, and both are scoped to crop-interaction gestures. Don't write to these fields anywhere else.
+- **`runtime.displayScale` / `workScale` / `dispImgW` / `dispImgH` / `box{X,Y,W,H}`** are written **only** by `applyGeometry` (and zeroed by `unloadImage`). Drag handlers may move `boxX/boxY` through `setBoxPosition` and resize handlers may move `boxW/boxH` through `setBoxSize` — both scoped to crop-interaction gestures. One blessed exception outside gestures: `toggleMirrorH/V` reflect `boxX`/`boxY` through `setBoxPosition` immediately before `dispatchAndRetransform` re-runs `applyGeometry`, so the mirrored position feeds the prev-center math and the box stays over the same source content. Don't write to these fields anywhere else.
 - **`runtime.cachedBaseRaster` / `sharedBufferVersion`** are written only by `convert` (image controller). Cleared by `unloadImage`. Invalidated for next `convert` (forces a pica rebuild) only via `invalidateBaseRaster()` — currently called from `ui/bindings.ts` (fit-position change) and `appController.handleBackgroundChange`.
 - **`output.{pxcBytes,bmpBytes}`** are written only via `setOutputBytes` / `clearOutputBytes` from `outputRuntime.ts` — and only by the GB controller (the image path encodes lazily on download).
 
@@ -152,19 +154,19 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/app/reducer.ts` | app | Pure reducer | `reducer` |
 | `src/app/messages.ts` | app | Status banner helpers | `showError`, `clearStatus` |
 | `src/app/validation.ts` | app | GB byte validation rules | `validateGbBytes` |
-| `src/app/loaderRouter.ts` | app | Routes a File to image vs gb controller | `createLoaderRouter` |
+| `src/app/loaderRouter.ts` | app | Routes a File (or pasted printer text) to image vs gb controller; unloads the opposite feature's live session first so a stale in-flight worker result can't repaint the new output | `createLoaderRouter` |
 | `src/app/appController.ts` | app | Top-level orchestration (device/mode/bg switches, zoom, rotate, download) | `createAppController`, `AppController` |
 | `src/app/sessionReset.ts` | app | Shared unload ritual (clear status, output, preview, file input) | `resetSession` |
 | `src/app/controllerHost.ts` | app | Shared deps shape for image + gb controllers (status, errors, histogram clear, session reset) | `ControllerHost` |
 | `src/app/runtime/imageRuntime.ts` | app | Mutable image-pipeline state (canvases, scales, box, caches, timers, versions) | `ImageRuntime`, `createImageRuntime` |
 | `src/app/runtime/gbRuntime.ts` | app | Mutable GB state (raw bytes, decoded pixels, palette remap) | `GbRuntime`, `createGbRuntime` |
 | `src/app/runtime/outputRuntime.ts` | app | Encoded output bytes | `OutputRuntime`, `createOutputRuntime`, `setOutputBytes`, `clearOutputBytes`, `hasOutput` |
-| `src/domain/geometry.ts` | domain | Editor scales + unified render plan + crop-box clamp | `computeEditorGeometry`, `buildImageRenderPlan`, `clampBoxToSource`, `clampBoxToDevice`, `clampBoxForMode`, `getImageAnalysisRegion`, `fitOffset` |
+| `src/domain/geometry.ts` | domain | Editor scales + unified render plan + crop-box clamp + rotated-dims/fit-pct helpers | `computeEditorGeometry`, `buildImageRenderPlan`, `clampBoxToSource`, `clampBoxToDevice`, `clampBoxForMode`, `getImageAnalysisRegion`, `fitOffset`, `rotatedSourceDims`, `computeMaxFitSizePct` |
 | `src/domain/tone.ts` | domain | Tone LUT + luminance + auto-levels | `buildToneLut`, `buildLuminanceBuffer`, `computeAutoLevels` |
 | `src/domain/histogram.ts` | domain | Histograms (Float32, Uint) | `buildHistogram`, `buildUintHistogram` |
 | `src/domain/dither.ts` | domain | Error-diffusion + ordered dither → 4-level indexed. Modes: `fs`, `atk`, `jjn`, `stucki`, `burkes`, `bayer`, `zhou-fang` (default), `blue-noise` | `ditherToIndexedGray`, `DitherMode`, `DITHER_FILENAME_SUFFIX` |
 | `src/domain/blueNoise.ts` | domain | Pre-computed blue-noise threshold matrix | (matrix data) |
-| `src/domain/quantize.ts` | domain | 4-level quantization helpers | quantize fns |
+| `src/domain/quantize.ts` | domain | 4-level quantization against explicit per-preset thresholds (`pr1614` default vs `master`); pure — the active preset lives in `state.quantPreset` | `quantize`, `getQuantThresholds`, `GRAY_DISP`, `QuantPreset`, `QuantThresholds`, `DEFAULT_QUANT_PRESET`, `QUANT_PRESET_LABELS` |
 | `src/domain/devices.ts` | domain | XTeink device specs | `DEVICES`, `DEFAULT_XT`, `DeviceKey` |
 | `src/domain/formats/pxc.ts` | domain | `.pxc` encoder | `encodePxc` |
 | `src/domain/formats/bmpGray.ts` | domain | 8-bit grayscale BMP encoder | `encodeGrayBmp` |
@@ -203,6 +205,7 @@ The convert pipeline is rAF-debounced (`requestConvert` cancels the in-flight rA
 | `src/ui/downloadButtons.ts` | ui | Download buttons | `bindDownloadButtons` |
 | `src/ui/cropInteraction.ts` | ui | Source-frame DOM events: drag, click, wheel zoom | `setupCropInteraction` |
 | `src/ui/previewZoom.ts` | ui | Preview canvas magnifier overlay | `setupPreviewZoom` |
+| `src/ui/quantPresetToggle.ts` | ui | Hidden Ctrl+Shift+Q quant-preset toggle: localStorage persistence, toast, dispatches `setQuantPreset`; `render` shows a persistent badge whenever the preset ≠ default | `installQuantPresetToggle` |
 
 ---
 
@@ -302,8 +305,9 @@ File picker (binary or .txt)
 
 ## 8. Concurrency / versioning
 
-Three monotonically-increasing counters guard async paths.
+Four monotonically-increasing counters guard async paths.
 
+- **`sessionVersion`** (`runtime.sessionVersion`) — bumped by `bumpImageSession` on every `unloadImage`. Captured at the start of `loadImageFile`, `convert`, and `autoLevels`; checked after every `await` and in the worker result/error handlers (via `inFlightProcessSession`) so work belonging to a torn-down session is dropped instead of repainting the new one.
 - **`processVersion`** (`runtime.processVersion`) — incremented per `worker.process` call. The worker echoes the version back; the result handler drops messages whose `version !== runtime.processVersion`. Prevents stale dither output from an interrupted run from overwriting a fresh one.
 - **`sharedBufferVersion`** (`runtime.sharedBufferVersion`) — incremented when a new SharedArrayBuffer is sent to the worker (i.e., raster was rebuilt). The worker uses the most recently sent buffer; this version is informational on the host side.
 - **`autoLevelsGen`** (`runtime.autoLevelsGen`) — incremented per `autoLevels()` call. The async pica + getImageData chain checks `gen !== runtime.autoLevelsGen` after each `await` to abort when superseded.
@@ -326,12 +330,13 @@ Three monotonically-increasing counters guard async paths.
 | Field | Type | Owner / writer | Reader |
 | --- | --- | --- | --- |
 | `loadedImg` | `HTMLImageElement \| null` | `loadImageFile` / `unloadImage` | many |
+| `sessionVersion` | `number` | `bumpImageSession` (called by `unloadImage`) | `loadImageFile`, `convert`, `autoLevels`, worker result/error handlers (stale-session guard) |
 | `rotatedSrc` | `HTMLCanvasElement \| null` | `buildRotatedSource` | `getSourceImage` |
 | `displayScale` | `number` | `applyGeometry` only | `applyGeometry`, `buildImageRenderPlan`, `applyCropBoxToDom` |
 | `workScale` | `number` | `applyGeometry` only | `applyGeometry`, `buildImageRenderPlan` |
 | `dispImgW` / `dispImgH` | `number` | `applyGeometry` only | `applyCropBoxToDom`, source canvas size |
 | `boxX` / `boxY` / `boxW` / `boxH` | `number` | `applyGeometry`, drag handlers (`setBoxPosition`), resize handlers (`setBoxSize`) | `applyCropBoxToDom`, `buildImageRenderPlan` |
-| `lastHistogram` | `Float32Array \| null` | worker result handler | `mountHistogramAutoResize` |
+| `lastHistogram` | `Float32Array \| null` | worker result handler; cleared by `unloadImage` | `mountHistogramAutoResize` |
 | `lastIndexedPixels` | `Uint8Array \| null` | worker result handler | preview render, download path |
 | `cachedBaseRaster` | `Uint8ClampedArray \| null` | `convert` (when `rasterDirty`) | next `convert` calls; SAB copy |
 | `sharedBufferVersion` | `number` | `convert` after SAB copy | (informational) |
@@ -369,7 +374,9 @@ Before writing X, use Y:
 | Resize a canvas before output | `stepDownscaleAndResize` | `infra/canvas/picaResize.ts` |
 | Apply tone (gamma/black/white/contrast/invert) | `buildToneLut` | `domain/tone.ts` — never per-pixel branches |
 | Auto-detect black/white points | `computeAutoLevels` (over `buildLuminanceBuffer` + `buildUintHistogram`) | `domain/tone.ts` |
-| Dither a Float32 buffer to 4-level indexed | `ditherToIndexedGray` (mode picked from `DitherMode` union — see `domain/dither.ts` for the eight supported modes) | `domain/dither.ts` |
+| Dither a Float32 buffer to 4-level indexed | `ditherToIndexedGray` (mode picked from `DitherMode` union — see `domain/dither.ts` for the eight supported modes; takes the quant-threshold triple) | `domain/dither.ts` |
+| Get quantization thresholds for a preset | `getQuantThresholds(state.quantPreset)` | `domain/quantize.ts` |
+| Compute rotated source dims / max fit-size % | `rotatedSourceDims` / `computeMaxFitSizePct` | `domain/geometry.ts` |
 | Build a histogram | `buildHistogram` (Float32) / `buildUintHistogram` (luminance Uint8) | `domain/histogram.ts` |
 | Draw a histogram | `renderHistogram` | `infra/canvas/histogramRenderer.ts` |
 | Paint indexed-pixel preview | `renderIndexedPreview` | `infra/canvas/previewRenderer.ts` |
@@ -432,7 +439,7 @@ Lessons from past changes, stated as bans:
 - **Don't trust `round(srcW × cropFitScale)` to land on `targetW`.** `srcW`/`srcH` are themselves rounded from `box ÷ displayScale`, so the source AR drifts off device AR by a sub-pixel and the loser axis lands 1 px short of target — drawing a 1-px fit-bg sliver at the rim. `buildImageRenderPlan` handles this in two places: the locked-AR branch returns target-sized fitted dims directly; the unlocked branch snaps a `target - rawFitted === 1` deficit up to target. Real letterboxes are dozens of pixels — preserve that distinction if you ever rework this.
 - **Don't pass non-integer offsets to `drawImage` for the output composite.** `fitOffset` rounds the centered branches because sub-pixel `drawImage` blends the resized canvas's rim with the underlying `fillRect` background, producing a faint colored line at the preview edge. Side-pinned offsets (`l/r/t/b`) are already integer.
 - **Don't add a `mode` flag to a single clamp.** Each clamp encodes one invariant: `clampBoxToSource` = fit-free-scale's lax source bounds; `clampBoxToDevice` = fit-locked-native's source bounds + ≤ device dims. Crop mode bypasses both — its box is fully recomputed from device AR in `applyGeometry`. Dispatch lives at the entry point in `domain/geometry.ts:clampBoxForMode(mode, fitLockNative, params)` — both `features/image/controller.ts:applyGeometry` and `ui/imageCropBridge.ts` call it. Don't dilute either clamp's contract by branching internally.
-- **Don't dispatch mode + fitLockNative as two separate actions.** The atomic `imageSetModePreset({ mode, fitLockNative })` reducer case keeps both fields consistent in one step. If you split them, `render()` runs between dispatches and momentarily sees a half-applied preset (e.g. `mode='fit'` with the previous `fitLockNative=true` from 1:1), flashing the wrong panel visibility and active-pill state.
+- **Don't dispatch mode + fitLockNative as two separate actions.** The atomic `imageSetModePreset({ mode, fitLockNative })` reducer case keeps both fields consistent in one step. If you split them, `render()` runs between dispatches and momentarily sees a half-applied preset (e.g. `mode='fit'` with the previous `fitLockNative=true` from 1:1), flashing the wrong panel visibility and active-pill state. The standalone `imageSetMode`/`imageSetFitLockNative` actions were deleted for exactly this reason — don't reintroduce them.
 - **Don't reinvent the mode-pill predicate.** `ui/render.ts:isModePillActive(datasetMode, image)` is the single source of truth for matching the three user-facing pills (Crop / Fit / 1:1) against the two-mode internal state (`'crop' \| 'fit'` + `fitLockNative`). Both the active-class painter (`ui/render.ts`) and the no-op guard in `ui/bindings.ts` consume it; keep them in lockstep.
 - **Don't fire the convert pipeline on no-op clicks.** Selector pills (device, image mode, dither mode, fit position, background, GB palette) and idempotent-result buttons (contrast reset, tone reset, auto-levels) must early-return when the click wouldn't change state — otherwise the user sees a preview flash and a worker round-trip for clicking the already-active option. The mode-pill no-op guard uses `isModePillActive` (above); other selectors compare `button.dataset.<key>` against the matching state field (the canonical dataset→state pairing lives alongside `setActive` calls in `ui/render.ts` — reuse it, don't reinvent it). Resets compare against `initialImageState.*`; tone reset must also check `!autoLevelsApplied` because the action clears that flag too. Auto-levels checks `state.image.autoLevelsApplied`. Re-applicable buttons (rotation, mirror, GB scale +/−, change/unload) and `change`-event toggles / `input`-event sliders are naturally guarded — no early-return needed there. All these guards live at the click-handler site in `ui/bindings.ts`, not inside `appController` setters, so the controllers stay callable for any future programmatic path that legitimately wants to re-run.
 
@@ -461,7 +468,7 @@ When in doubt about whether to add a test: if the function would run in node wit
 | --- | --- |
 | `npm run dev` | Vite dev server at http://localhost:5173 |
 | `npm test` | Vitest run, all suites |
-| `npm run build` | `tsc --noEmit && vite build` → `dist/` |
+| `npm run build` | `tsc --noEmit && depcruise … && vite build` → `dist/` |
 | `npx wrangler pages deploy dist --project-name=crosspoint-pxc-converter --branch=main` | Deploy `dist/` to Cloudflare Pages |
 
 Production requires `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` for SharedArrayBuffer; see `public/_headers`.

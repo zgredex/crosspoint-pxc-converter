@@ -3,7 +3,7 @@ import type { AppDom } from './dom';
 import { setupCropInteraction } from './cropInteraction';
 import { setBoxPosition, setBoxSize, type ImageRuntime } from '../app/runtime/imageRuntime';
 import { applyCropBoxToDom, nudgeCropBoxIntoView as nudgeCropBox } from '../features/image/cropBox';
-import { clampBoxForMode } from '../domain/geometry';
+import { clampBoxForMode, rotatedSourceDims } from '../domain/geometry';
 
 const SNAP_THRESHOLD = 9;
 const WHEEL_ZOOM_K = 0.0015;
@@ -23,8 +23,7 @@ export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: ()
     const state = deps.store.getState();
     const dims = state.image.sourceDims;
     if (!dims) return { w: 0, h: 0 };
-    const rotated = state.image.rotation === 90 || state.image.rotation === 270;
-    return rotated ? { w: dims.height, h: dims.width } : { w: dims.width, h: dims.height };
+    return rotatedSourceDims(dims.width, dims.height, state.image.rotation);
   }
 
   return setupCropInteraction({

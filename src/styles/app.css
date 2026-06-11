@@ -944,3 +944,19 @@ footer code {
   image-rendering: pixelated;
   max-width: 100%;
 }
+
+/* Quant-preset badge — persistent indicator that the hidden Ctrl+Shift+Q toggle
+   has the non-default preset persisted in localStorage. */
+.quant-badge {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: var(--muted);
+  pointer-events: none;
+  z-index: 90;
+}

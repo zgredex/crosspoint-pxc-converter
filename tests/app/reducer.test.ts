@@ -114,6 +114,13 @@ describe('app reducer', () => {
     expect(reducer(applied, actions.imageSetContrast(15)).image.autoLevelsApplied).toBe(true);
   });
 
+  it('switches the quant preset', () => {
+    expect(initialAppState.quantPreset).toBe('pr1614');
+    const next = reducer(initialAppState, actions.setQuantPreset('master'));
+    expect(next.quantPreset).toBe('master');
+    expect(reducer(next, actions.setQuantPreset('pr1614')).quantPreset).toBe('pr1614');
+  });
+
   it('stores and clears UI status messages', () => {
     const withMessage = reducer(initialAppState, actions.uiSetMessage('error', 'Bad input'));
 

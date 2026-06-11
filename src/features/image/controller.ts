@@ -25,7 +25,7 @@ import {
   type ImageRenderPlan,
 } from '../../domain/geometry';
 import { buildUintHistogram } from '../../domain/histogram';
-import { getQuantPreset } from '../../domain/quantize';
+import { getQuantThresholds } from '../../domain/quantize';
 import { buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
 import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/imageLoader';
 import { renderHistogram } from '../../infra/canvas/histogramRenderer';
@@ -132,7 +132,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.runtime.lastHistogram = new Float32Array(result.histogram);
 
     renderIndexedPreview(deps.elements.previewCanvas, deps.runtime.lastIndexedPixels, state.device.targetW, state.device.targetH);
-    renderHistogram(deps.elements.histogramCanvas, deps.runtime.lastHistogram, state.device.totalPixels);
+    renderHistogram(deps.elements.histogramCanvas, deps.runtime.lastHistogram, state.device.totalPixels, getQuantThresholds(state.quantPreset));
     deps.store.dispatch(actions.outputSetReady(true, true));
 
     processing = false;
@@ -211,6 +211,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
     clearBaseRaster(deps.runtime);
     deps.runtime.lastIndexedPixels = null;
+    deps.runtime.lastHistogram = null;
     deps.runtime.autoLevelsGen++;
     rasterDirty = true;
     processing = false;
@@ -463,52 +464,64 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     const state = getState();
     const sessionVersion = deps.runtime.sessionVersion;
 
-    if (rasterDirty || !deps.runtime.cachedBaseRaster) {
-      const src = getActiveSource();
-      const plan = currentRenderPlan(srcW(src), srcH(src));
+    // Main-thread failures (pica, getImageData, SAB allocation) must reset the single-flight gate
+    // just like worker.onError does; otherwise `processing` stays true and every later
+    // requestConvert only sets `processRequested`, locking the pipeline until the next file load.
+    try {
+      if (rasterDirty || !deps.runtime.cachedBaseRaster) {
+        const src = getActiveSource();
+        const plan = currentRenderPlan(srcW(src), srcH(src));
 
-      await renderImageBaseRaster({
-        src,
-        targetCanvas: deps.elements.workCanvas,
-        plan,
-        fitBg: state.background,
-        pica: deps.pica,
-      });
-      if (!isCurrentSession(sessionVersion)) return;
+        await renderImageBaseRaster({
+          src,
+          targetCanvas: deps.elements.workCanvas,
+          plan,
+          fitBg: state.background,
+          pica: deps.pica,
+        });
+        if (!isCurrentSession(sessionVersion)) return;
 
-      const baseRaster = getContext2d(deps.elements.workCanvas).getImageData(
-        0, 0, state.device.targetW, state.device.targetH,
-      ).data;
-      commitBaseRaster(deps.runtime, baseRaster);
+        const baseRaster = getContext2d(deps.elements.workCanvas).getImageData(
+          0, 0, state.device.targetW, state.device.targetH,
+        ).data;
+        commitBaseRaster(deps.runtime, baseRaster);
 
-      const sharedBuffer = new SharedArrayBuffer(baseRaster.byteLength);
-      new Uint8ClampedArray(sharedBuffer).set(baseRaster);
-      const sharedBufferVersion = bumpSharedBufferVersion(deps.runtime);
-      deps.worker.setBaseRaster(
-        sharedBuffer,
-        state.device.targetW,
-        state.device.targetH,
-        sharedBufferVersion,
+        const sharedBuffer = new SharedArrayBuffer(baseRaster.byteLength);
+        new Uint8ClampedArray(sharedBuffer).set(baseRaster);
+        const sharedBufferVersion = bumpSharedBufferVersion(deps.runtime);
+        deps.worker.setBaseRaster(
+          sharedBuffer,
+          state.device.targetW,
+          state.device.targetH,
+          sharedBufferVersion,
+        );
+
+        rasterDirty = false;
+      }
+
+      inFlightProcessSession = sessionVersion;
+      deps.runtime.processVersion++;
+      deps.worker.process(
+        {
+          blackPoint: state.image.blackPoint,
+          whitePoint: state.image.whitePoint,
+          gammaValue: state.image.gammaValue,
+          contrastValue: state.image.contrastValue,
+          invert: state.image.invert,
+          ditherEnabled: state.image.ditherEnabled,
+          ditherMode: state.image.ditherMode,
+          quantPreset: state.quantPreset,
+        },
+        deps.runtime.processVersion,
       );
-
-      rasterDirty = false;
+    } catch (error) {
+      // Stale failures belong to a superseded session whose unload already reset the gate —
+      // resetting here would clobber a newer convert's in-flight state.
+      if (!isCurrentSession(sessionVersion)) return;
+      processing = false;
+      deps.host.showError(error instanceof Error ? error.message : 'Image processing failed.');
+      if (processRequested) scheduleNextConvert();
     }
-
-    inFlightProcessSession = sessionVersion;
-    deps.runtime.processVersion++;
-    deps.worker.process(
-      {
-        blackPoint: state.image.blackPoint,
-        whitePoint: state.image.whitePoint,
-        gammaValue: state.image.gammaValue,
-        contrastValue: state.image.contrastValue,
-        invert: state.image.invert,
-        ditherEnabled: state.image.ditherEnabled,
-        ditherMode: state.image.ditherMode,
-        quantPreset: getQuantPreset(),
-      },
-      deps.runtime.processVersion,
-    );
   }
 
   async function refreshTransformedSource(): Promise<void> {

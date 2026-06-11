@@ -1,7 +1,6 @@
 import { actions } from './actions';
-import type { AppDom } from '../ui/dom';
 import { triggerDownload } from '../infra/browser/downloads';
-import { clearOutputBytes, type OutputRuntime } from './runtime/outputRuntime';
+import type { OutputRuntime } from './runtime/outputRuntime';
 import type { AppStore } from './store';
 import type { GbRuntime } from './runtime/gbRuntime';
 import type { ImageRuntime } from './runtime/imageRuntime';
@@ -34,7 +33,8 @@ export type AppController = {
 
 type AppControllerDeps = {
   store: AppStore;
-  dom: AppDom;
+  workCanvas: HTMLCanvasElement;
+  previewCanvas: HTMLCanvasElement;
   imageRuntime: ImageRuntime;
   gbRuntime: GbRuntime;
   output: OutputRuntime;
@@ -45,15 +45,10 @@ type AppControllerDeps = {
 export function createAppController(deps: AppControllerDeps): AppController {
   function resizeOutputCanvases(): void {
     const { targetW, targetH } = deps.store.getState().device;
-    deps.dom.workCanvas.width = targetW;
-    deps.dom.workCanvas.height = targetH;
-    deps.dom.previewCanvas.width = targetW;
-    deps.dom.previewCanvas.height = targetH;
-  }
-
-  function clearOutput(): void {
-    clearOutputBytes(deps.output);
-    deps.store.dispatch(actions.outputClear());
+    deps.workCanvas.width = targetW;
+    deps.workCanvas.height = targetH;
+    deps.previewCanvas.width = targetW;
+    deps.previewCanvas.height = targetH;
   }
 
   function handleDeviceChange(): void {
@@ -71,7 +66,9 @@ export function createAppController(deps: AppControllerDeps): AppController {
       return;
     }
 
-    clearOutput();
+    // Nothing loaded: output bytes are already null (every unload path runs resetSession);
+    // only the store-side ready flags need clearing.
+    deps.store.dispatch(actions.outputClear());
   }
 
   function handleImageLayoutChange(): void {

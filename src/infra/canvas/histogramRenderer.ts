@@ -1,8 +1,8 @@
 import { buildBinnedHistogram, computeHistogramZones } from '../../domain/histogram';
+import type { QuantThresholds } from '../../domain/quantize';
 import { getContext2d } from './context';
 
-export function clearHistogram(canvas: HTMLCanvasElement, runtime: { lastHistogram: Float32Array | null }): void {
-  runtime.lastHistogram = null;
+export function clearHistogram(canvas: HTMLCanvasElement): void {
   if (canvas.width) {
     getContext2d(canvas).clearRect(0, 0, canvas.width, canvas.height);
   }
@@ -25,10 +25,11 @@ export function mountHistogramAutoResize(params: {
   canvas: HTMLCanvasElement;
   getHistogram: () => Float32Array | null;
   getTotalPixels: () => number;
+  getThresholds: () => QuantThresholds;
 }): void {
   window.addEventListener('resize', () => {
     resizeHistogramCanvas(params.canvas);
-    renderHistogram(params.canvas, params.getHistogram(), params.getTotalPixels());
+    renderHistogram(params.canvas, params.getHistogram(), params.getTotalPixels(), params.getThresholds());
   });
 }
 
@@ -36,6 +37,7 @@ export function renderHistogram(
   canvas: HTMLCanvasElement,
   histogram: Float32Array | null,
   totalPixels: number,
+  thresholds: QuantThresholds,
 ): void {
   if (!histogram) return;
 
@@ -53,7 +55,7 @@ export function renderHistogram(
   const context = getContext2d(canvas);
   context.clearRect(0, 0, cw, ch);
 
-  const zones = computeHistogramZones(histogram, totalPixels);
+  const zones = computeHistogramZones(histogram, totalPixels, thresholds);
   for (const zone of zones) {
     const x1 = (zone.xLo / 255) * cw;
     const x2 = (zone.xHi / 255) * cw;
@@ -83,7 +85,7 @@ export function renderHistogram(
 
   context.strokeStyle = 'rgba(232,232,234,0.25)';
   context.lineWidth = 1;
-  for (const threshold of [42, 127, 212]) {
+  for (const threshold of thresholds) {
     const x = (threshold / 255) * cw;
     context.beginPath();
     context.moveTo(x, 0);
@@ -112,7 +114,7 @@ export function renderHistogram(
   context.font = `${Math.round(9 * dpr)}px monospace`;
   context.textBaseline = 'bottom';
   context.textAlign = 'center';
-  for (const threshold of [42, 127, 212]) {
+  for (const threshold of thresholds) {
     context.fillText(String(threshold), (threshold / 255) * cw, ch - 1);
   }
 }

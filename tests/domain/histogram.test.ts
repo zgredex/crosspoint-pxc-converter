@@ -19,9 +19,21 @@ describe('histogram', () => {
     hist[0] = 50;
     hist[100] = 25;
     hist[200] = 25;
-    const zones = computeHistogramZones(hist, 100);
+    const zones = computeHistogramZones(hist, 100, [42, 127, 212]);
 
     expect(zones.map(zone => zone.pct)).toEqual([50, 25, 25, 0]);
+  });
+
+  it('moves zone boundaries with the given thresholds', () => {
+    const hist = new Float32Array(256);
+    hist[43] = 100;
+    const pr1614 = computeHistogramZones(hist, 100, [42, 127, 212]);
+    const master = computeHistogramZones(hist, 100, [45, 70, 140]);
+
+    expect(pr1614.map(zone => zone.pct)).toEqual([0, 100, 0, 0]);
+    expect(master.map(zone => zone.pct)).toEqual([100, 0, 0, 0]);
+    expect(master.map(zone => zone.lo)).toEqual([0, 45, 70, 140]);
+    expect(master.map(zone => zone.hi)).toEqual([44, 69, 139, 255]);
   });
 
   it('bins histogram data', () => {

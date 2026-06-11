@@ -1,5 +1,7 @@
 import type { AppState } from '../app/state';
 import { computeGbDisplayScale } from '../domain/gb/displayScale';
+import { computeMaxFitSizePct, rotatedSourceDims } from '../domain/geometry';
+import { DEFAULT_QUANT_PRESET, QUANT_PRESET_LABELS } from '../domain/quantize';
 import type { AppDom } from './dom';
 
 // Three user-facing pills, two internal modes: '1:1' = fit + fitLockNative.
@@ -33,6 +35,11 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.statusBanner.textContent = state.ui.message ?? '';
   dom.statusBanner.className = state.ui.tone ? `status-banner ${state.ui.tone}` : 'status-banner';
 
+  dom.quantPresetBadge.hidden = state.quantPreset === DEFAULT_QUANT_PRESET;
+  dom.quantPresetBadge.textContent = state.quantPreset === DEFAULT_QUANT_PRESET
+    ? ''
+    : `Quant: ${QUANT_PRESET_LABELS[state.quantPreset]}`;
+
   dom.dropZone.style.display = state.loadedType === null ? '' : 'none';
   dom.editorSection.classList.toggle('visible', state.loadedType !== null);
   dom.gbSourceWrap.style.display = isGbLoaded ? '' : 'none';
@@ -64,11 +71,13 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   dom.fitSizeRow.style.display = fitFreeScale ? '' : 'none';
   let fitSizeMaxPct = 100;
   if (state.image.fitNoUpscale && state.image.sourceDims) {
-    const rotated = state.image.rotation === 90 || state.image.rotation === 270;
-    const sW = rotated ? state.image.sourceDims.height : state.image.sourceDims.width;
-    const sH = rotated ? state.image.sourceDims.width : state.image.sourceDims.height;
-    const maxFit = Math.min(state.device.targetW / sW, state.device.targetH / sH);
-    if (maxFit > 1) fitSizeMaxPct = Math.max(10, Math.floor(100 / maxFit));
+    const dims = rotatedSourceDims(state.image.sourceDims.width, state.image.sourceDims.height, state.image.rotation);
+    fitSizeMaxPct = computeMaxFitSizePct({
+      sourceW: dims.w,
+      sourceH: dims.h,
+      targetW: state.device.targetW,
+      targetH: state.device.targetH,
+    });
   }
   const effectiveFitSizePct = Math.min(state.image.fitSizePct, fitSizeMaxPct);
   dom.fitSizeSlider.max = String(fitSizeMaxPct);

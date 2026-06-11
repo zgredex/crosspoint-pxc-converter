@@ -59,6 +59,25 @@ export function computeEditorGeometry(params: {
   };
 }
 
+// Source dims as the editor sees them after rotation: 90/270 swap the axes.
+export function rotatedSourceDims(width: number, height: number, rotation: number): { w: number; h: number } {
+  return rotation % 180 === 0 ? { w: width, h: height } : { w: height, h: width };
+}
+
+// Largest fit-size percent that doesn't upscale the source. When the source already fills (or
+// overflows) the device on some axis, full fit is a downscale and the slider's whole 10–100%
+// range applies. The 10% floor matches the reducer's fitSizePct clamp.
+export function computeMaxFitSizePct(params: {
+  sourceW: number;
+  sourceH: number;
+  targetW: number;
+  targetH: number;
+}): number {
+  const maxFit = Math.min(params.targetW / params.sourceW, params.targetH / params.sourceH);
+  if (maxFit <= 1) return 100;
+  return Math.max(10, Math.floor(100 / maxFit));
+}
+
 export function fitOffset(fw: number, fh: number, targetW: number, targetH: number, pos: FitAlign): { x: number; y: number } {
   // Center offsets must round to whole pixels: drawImage at a sub-pixel offset blends the
   // resized canvas's rim with the fit-bg fillRect underneath, producing a faint colored line

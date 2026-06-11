@@ -4,8 +4,10 @@ import {
   buildImageRenderPlan,
   clampBoxToDevice,
   clampBoxToSource,
+  computeMaxFitSizePct,
   fitOffset,
   getImageAnalysisRegion,
+  rotatedSourceDims,
 } from '../../src/domain/geometry';
 
 describe('fitOffset', () => {
@@ -15,6 +17,31 @@ describe('fitOffset', () => {
 
   it('computes bottom-right placement', () => {
     expect(fitOffset(100, 200, 480, 800, 'br')).toEqual({ x: 380, y: 600 });
+  });
+});
+
+describe('rotatedSourceDims', () => {
+  it('keeps axes for 0/180 and swaps them for 90/270', () => {
+    expect(rotatedSourceDims(1920, 1080, 0)).toEqual({ w: 1920, h: 1080 });
+    expect(rotatedSourceDims(1920, 1080, 180)).toEqual({ w: 1920, h: 1080 });
+    expect(rotatedSourceDims(1920, 1080, 90)).toEqual({ w: 1080, h: 1920 });
+    expect(rotatedSourceDims(1920, 1080, 270)).toEqual({ w: 1080, h: 1920 });
+  });
+});
+
+describe('computeMaxFitSizePct', () => {
+  it('caps the slider at the percent where fit reaches native size', () => {
+    // 240×400 source on a 480×800 device: full fit is a 2× upscale, so 50% is native size.
+    expect(computeMaxFitSizePct({ sourceW: 240, sourceH: 400, targetW: 480, targetH: 800 })).toBe(50);
+  });
+
+  it('returns the full range when fit is a downscale', () => {
+    expect(computeMaxFitSizePct({ sourceW: 960, sourceH: 1600, targetW: 480, targetH: 800 })).toBe(100);
+    expect(computeMaxFitSizePct({ sourceW: 480, sourceH: 800, targetW: 480, targetH: 800 })).toBe(100);
+  });
+
+  it('never drops below the slider floor of 10%', () => {
+    expect(computeMaxFitSizePct({ sourceW: 10, sourceH: 10, targetW: 480, targetH: 800 })).toBe(10);
   });
 });
 

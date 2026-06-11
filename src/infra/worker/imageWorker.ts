@@ -1,6 +1,6 @@
 import { ditherToIndexedGray } from '../../domain/dither';
 import { buildHistogram } from '../../domain/histogram';
-import { setQuantPreset } from '../../domain/quantize';
+import { getQuantThresholds } from '../../domain/quantize';
 import { buildToneLut } from '../../domain/tone';
 import type { WorkerInMessage, WorkerOutMessage } from './workerProtocol';
 
@@ -35,7 +35,6 @@ function processMessage(e: MessageEvent<WorkerInMessage>): void {
 
     const { settings, version } = msg;
     try {
-      setQuantPreset(settings.quantPreset);
       const toneLut = buildToneLut(settings);
       const totalPixels = baseRaster.length / 4;
       const buffer = new Float32Array(totalPixels);
@@ -47,7 +46,14 @@ function processMessage(e: MessageEvent<WorkerInMessage>): void {
       }
 
       const histogram = buildHistogram(buffer);
-      const indexedPixels = ditherToIndexedGray(buffer, baseWidth, baseHeight, settings.ditherEnabled, settings.ditherMode);
+      const indexedPixels = ditherToIndexedGray(
+        buffer,
+        baseWidth,
+        baseHeight,
+        settings.ditherEnabled,
+        settings.ditherMode,
+        getQuantThresholds(settings.quantPreset),
+      );
 
       const response: WorkerOutMessage = {
         type: 'result',

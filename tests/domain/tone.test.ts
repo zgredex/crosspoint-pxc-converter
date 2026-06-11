@@ -52,6 +52,13 @@ describe('tone', () => {
     expect(lut[255]).toBeCloseTo(255, 5);
   });
 
+  it('buildToneLut keeps fractional precision between remap and gamma', () => {
+    const lut = buildToneLut({ ...defaultSettings, blackPoint: 100, whitePoint: 200, gammaValue: 2 });
+    // (101-100)/100*255 = 2.55 → sqrt(2.55/255)*255 = 25.5; rounding the remap to an
+    // integer before gamma would give sqrt(3/255)*255 ≈ 27.66 instead.
+    expect(lut[101]).toBeCloseTo(25.5, 3);
+  });
+
   it('buildToneLut applies positive contrast', () => {
     const lut = buildToneLut({ ...defaultSettings, contrastValue: 50 });
     expect(lut[100]).toBeLessThan(100);

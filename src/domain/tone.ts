@@ -36,8 +36,7 @@ export function buildToneLut(settings: {
     }
 
     if (gammaActive) {
-      const idx = Math.min(255, Math.max(0, Math.round(v)));
-      v = Math.pow(idx / 255, gammaInv) * 255;
+      v = Math.pow(Math.min(255, Math.max(0, v)) / 255, gammaInv) * 255;
     }
 
     if (contrastActive) {

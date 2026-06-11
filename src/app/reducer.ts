@@ -9,12 +9,10 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
       return { ...state, device: getDeviceState(action.deviceKey) };
     case 'setBackground':
       return { ...state, background: action.background };
-    case 'image/setMode':
-      return { ...state, image: { ...state.image, mode: action.mode } };
+    case 'setQuantPreset':
+      return { ...state, quantPreset: action.quantPreset };
     case 'image/setModePreset':
       return { ...state, image: { ...state.image, mode: action.mode, fitLockNative: action.fitLockNative } };
-    case 'image/setFitLockNative':
-      return { ...state, image: { ...state.image, fitLockNative: action.fitLockNative } };
     case 'image/setFitAlign':
       return { ...state, image: { ...state.image, fitAlign: action.fitAlign } };
     case 'image/setContrast':

@@ -8,6 +8,7 @@ import { createOutputRuntime } from './runtime/outputRuntime';
 import { resetSession } from './sessionReset';
 import { store } from './store';
 import { validateGbBytes } from './validation';
+import { getQuantThresholds } from '../domain/quantize';
 import { clearHistogram, mountHistogramAutoResize } from '../infra/canvas/histogramRenderer';
 import { createPicaResizer } from '../infra/canvas/picaResize';
 import { createImageWorkerClient } from '../infra/worker/imageWorkerClient';
@@ -50,7 +51,7 @@ const {
 } = dom;
 
 function clearHistogramView(): void {
-  clearHistogram(histogramCanvas, imageRuntime);
+  clearHistogram(histogramCanvas);
 }
 
 function resetSessionShared(): void {
@@ -87,6 +88,7 @@ mountHistogramAutoResize({
   canvas: histogramCanvas,
   getHistogram: () => imageRuntime.lastHistogram,
   getTotalPixels: () => store.getState().device.totalPixels,
+  getThresholds: () => getQuantThresholds(store.getState().quantPreset),
 });
 
 imageController = createImageController({
@@ -121,7 +123,8 @@ gbController = createGbController({
 
 appController = createAppController({
   store,
-  dom,
+  workCanvas: dom.workCanvas,
+  previewCanvas: dom.previewCanvas,
   imageRuntime,
   gbRuntime,
   output: outputRuntime,
@@ -132,6 +135,7 @@ appController = createAppController({
 const loaderRouter = createLoaderRouter({
   imageController,
   gbController,
+  getLoadedType: () => store.getState().loadedType,
 });
 
 bindStoreControls(dom, {
@@ -162,7 +166,7 @@ bindZoomControls({
 bindFileInput({
   dom,
   loadFile: loaderRouter.loadFile,
-  loadPrinterText: gbController.loadPrinterText,
+  loadPrinterText: loaderRouter.loadPrinterText,
 });
 
 bindImageControls({
@@ -185,6 +189,7 @@ bindDownloadButtons({
 });
 
 installQuantPresetToggle({
+  store,
   requestReprocess: () => imageController.requestConvert(),
 });
 

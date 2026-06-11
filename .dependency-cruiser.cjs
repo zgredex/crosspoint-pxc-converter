@@ -34,6 +34,15 @@ module.exports = {
       to: { path: '^src/(features|ui)/' },
     },
     {
+      name: 'app-wiring-no-ui',
+      severity: 'error',
+      comment:
+        'The wiring exception covers feature factories/types only for appController.ts and ' +
+        'loaderRouter.ts; ui/ imports are bootstrap-only (it alone composes the DOM bindings).',
+      from: { path: '^src/app/(appController|loaderRouter)\\.ts$' },
+      to: { path: '^src/ui/' },
+    },
+    {
       name: 'features-no-ui',
       severity: 'error',
       comment: 'features/ must not import from ui/ — bridge through deps callbacks.',
