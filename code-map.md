@@ -80,7 +80,7 @@ For each piece of logic, exactly one canonical home. **Adding a parallel impleme
 | Worker process protocol | Types in `infra/worker/workerProtocol.ts`; worker `infra/worker/imageWorker.ts` ↔ host `infra/worker/imageWorkerClient.ts` |
 | GB display-scale math (default scale, zoom clamp) | `domain/gb/displayScale.ts:computeGbDisplayScale` (used by `features/gb/service.ts:buildGbSourceView` and `ui/render.ts`) |
 | Quantization profile per preset | `domain/quantize.ts:getQuantProfile(preset)` — `thresholds` = dither-off hard quantize (firmware quantizeSimple); `ditherThresholds`/`ditherLevels` = error-diffusion calibration (master mirrors the firmware's X4-tuned Atkinson/FS branch in `crosspoint-reader` BitmapHelpers.h: bins 30/50/140, perceived levels 15/30/80/210). Histogram zones/markers use `getActiveQuantThresholds(preset, ditherEnabled)` — the dither triple when dithering is enabled, the hard triple when not. Never hardcode any of these. |
-| Rotated source dims + max fit-size percent under no-upscale | `domain/geometry.ts:rotatedSourceDims` + `computeMaxFitSizePct` (used by `ui/render.ts`, `ui/bindings.ts`, `ui/imageCropBridge.ts`) |
+| Rotated source dims + max fit-size percent under no-upscale | `domain/geometry.ts:rotatedSourceDims` (used by `ui/imageCropBridge.ts` and `domain/gb/displayScale.ts`) + `computeMaxFitSizePct` (called only by `features/image/controller.ts:syncFitSizeMaxPct`, which writes the result into `state.image.fitSizeMaxPct`; `ui/render.ts` and `ui/bindings.ts` read the state field) |
 
 ---
 

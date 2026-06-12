@@ -29,6 +29,7 @@ export type AppAction =
   | { type: 'image/setEditorMaxZoom'; editorMaxZoom: number }
   | { type: 'image/setSourceDims'; dims: ImageDims | null }
   | { type: 'image/setFitSizePct'; fitSizePct: number }
+  | { type: 'image/setFitSizeMaxPct'; fitSizeMaxPct: number }
   | { type: 'image/setFitNoUpscale'; fitNoUpscale: boolean }
   | { type: 'image/resetAll' }
   | { type: 'gb/setPalette'; paletteKey: GbPaletteKey }
@@ -74,6 +75,7 @@ export const actions = {
   imageSetEditorMaxZoom: (editorMaxZoom: number): AppAction => ({ type: 'image/setEditorMaxZoom', editorMaxZoom }),
   imageSetSourceDims: (dims: ImageDims | null): AppAction => ({ type: 'image/setSourceDims', dims }),
   imageSetFitSizePct: (fitSizePct: number): AppAction => ({ type: 'image/setFitSizePct', fitSizePct }),
+  imageSetFitSizeMaxPct: (fitSizeMaxPct: number): AppAction => ({ type: 'image/setFitSizeMaxPct', fitSizeMaxPct }),
   imageSetFitNoUpscale: (fitNoUpscale: boolean): AppAction => ({ type: 'image/setFitNoUpscale', fitNoUpscale }),
   imageResetAll: (): AppAction => ({ type: 'image/resetAll' }),
   gbSetPalette: (paletteKey: GbPaletteKey): AppAction => ({ type: 'gb/setPalette', paletteKey }),

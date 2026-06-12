@@ -82,6 +82,7 @@ const { clearSnap } = setupImageCropInteraction({
   invalidateBaseRaster: () => imageController.invalidateBaseRaster(),
   applyEditorZoom: (zoom, x, y) => imageController.applyEditorZoom(zoom, x, y),
   notifyCropRegionChanged: () => imageController.notifyCropRegionChanged(),
+  syncFitSizeMaxPct: () => imageController.syncFitSizeMaxPct(),
 });
 
 mountHistogramAutoResize({
@@ -194,7 +195,11 @@ bindDownloadButtons({
 
 installQuantPresetToggle({
   store,
-  requestReprocess: () => imageController.requestConvert(),
+  requestReprocess: () => {
+    // The preset only affects the image pipeline; a convert request during a GB
+    // session would just strand a processRequested flag on the image controller.
+    if (store.getState().loadedType === 'image') imageController.requestConvert();
+  },
 });
 
 render();

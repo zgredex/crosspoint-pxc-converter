@@ -127,4 +127,19 @@ describe('app reducer', () => {
     expect(withMessage.ui).toEqual({ tone: 'error', message: 'Bad input' });
     expect(reducer(withMessage, actions.uiClearMessage()).ui).toEqual({ tone: null, message: null });
   });
+
+  it('image/setFitSizeMaxPct clamps low values to 10', () => {
+    const next = reducer(initialAppState, actions.imageSetFitSizeMaxPct(5));
+    expect(next.image.fitSizeMaxPct).toBe(10);
+  });
+
+  it('image/setFitSizeMaxPct clamps high values to 100', () => {
+    const next = reducer(initialAppState, actions.imageSetFitSizeMaxPct(150));
+    expect(next.image.fitSizeMaxPct).toBe(100);
+  });
+
+  it('image/setFitSizeMaxPct rounds fractional values', () => {
+    const next = reducer(initialAppState, actions.imageSetFitSizeMaxPct(47.6));
+    expect(next.image.fitSizeMaxPct).toBe(48);
+  });
 });

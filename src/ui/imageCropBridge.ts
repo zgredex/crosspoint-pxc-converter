@@ -16,6 +16,7 @@ type CropWiringDeps = {
   invalidateBaseRaster: () => void;
   applyEditorZoom: (targetZoom: number, anchorClientX?: number, anchorClientY?: number) => void;
   notifyCropRegionChanged: () => void;
+  syncFitSizeMaxPct: () => void;
 };
 
 export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: () => void } {
@@ -79,6 +80,6 @@ export function setupImageCropInteraction(deps: CropWiringDeps): { clearSnap: ()
       deps.invalidateBaseRaster();
       deps.scheduleConvert();
     },
-    onCropRegionChanged: deps.notifyCropRegionChanged,
+    onCropRegionChanged: () => { deps.notifyCropRegionChanged(); deps.syncFitSizeMaxPct(); },
   });
 }

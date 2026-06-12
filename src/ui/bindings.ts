@@ -4,7 +4,7 @@ import type { AppStore } from '../app/store';
 import type { DeviceKey } from '../domain/devices';
 import type { DitherMode } from '../domain/dither';
 import type { GbPaletteKey } from '../domain/formats/bmpGb';
-import { computeMaxFitSizePct, rotatedSourceDims, type FitAlign } from '../domain/geometry';
+import { type FitAlign } from '../domain/geometry';
 import { initialImageState, type FitBackground, type ImageMode } from '../app/state';
 import type { AppDom } from './dom';
 import { isModePillActive } from './render';
@@ -47,20 +47,12 @@ export function bindStoreControls(dom: AppDom, deps: BindingDeps): void {
     // When the guard turns on, snap the size slider down to the largest value that doesn't
     // upscale, so the displayed slider value matches the effective scale. Without this the
     // slider would read 100% while the actual output is capped at native size — confusing.
+    // The ceiling now lives in state.image.fitSizeMaxPct, maintained by the image controller
+    // from the box selection via syncFitSizeMaxPct.
     if (noUpscale) {
       const state = store.getState();
-      const dims = state.image.sourceDims;
-      if (dims) {
-        const rotated = rotatedSourceDims(dims.width, dims.height, state.image.rotation);
-        const maxPct = computeMaxFitSizePct({
-          sourceW: rotated.w,
-          sourceH: rotated.h,
-          targetW: state.device.targetW,
-          targetH: state.device.targetH,
-        });
-        if (state.image.fitSizePct > maxPct) {
-          store.dispatch(actions.imageSetFitSizePct(maxPct));
-        }
+      if (state.image.fitSizePct > state.image.fitSizeMaxPct) {
+        store.dispatch(actions.imageSetFitSizePct(state.image.fitSizeMaxPct));
       }
     }
     deps.invalidateBaseRaster();

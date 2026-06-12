@@ -1,6 +1,5 @@
 import type { AppState } from '../app/state';
 import { computeGbDisplayScale } from '../domain/gb/displayScale';
-import { computeMaxFitSizePct, rotatedSourceDims } from '../domain/geometry';
 import { DEFAULT_QUANT_PRESET, QUANT_PRESET_LABELS } from '../domain/quantize';
 import type { AppDom } from './dom';
 
@@ -69,16 +68,7 @@ export function renderStoreState(dom: AppDom, state: AppState): void {
   const fitFreeScale = state.image.mode === 'fit' && !state.image.fitLockNative;
   dom.posSection.classList.toggle('disabled', !positionGridUsable);
   dom.fitSizeRow.style.display = fitFreeScale ? '' : 'none';
-  let fitSizeMaxPct = 100;
-  if (state.image.fitNoUpscale && state.image.sourceDims) {
-    const dims = rotatedSourceDims(state.image.sourceDims.width, state.image.sourceDims.height, state.image.rotation);
-    fitSizeMaxPct = computeMaxFitSizePct({
-      sourceW: dims.w,
-      sourceH: dims.h,
-      targetW: state.device.targetW,
-      targetH: state.device.targetH,
-    });
-  }
+  const fitSizeMaxPct = state.image.fitNoUpscale ? state.image.fitSizeMaxPct : 100;
   const effectiveFitSizePct = Math.min(state.image.fitSizePct, fitSizeMaxPct);
   dom.fitSizeSlider.max = String(fitSizeMaxPct);
   dom.fitSizeSlider.value = String(effectiveFitSizePct);

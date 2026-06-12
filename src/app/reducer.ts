@@ -87,6 +87,11 @@ export function reducer(state: AppState = initialAppState, action: AppAction): A
         ...state,
         image: { ...state.image, fitSizePct: Math.max(10, Math.min(100, Math.round(action.fitSizePct))) },
       };
+    case 'image/setFitSizeMaxPct':
+      return {
+        ...state,
+        image: { ...state.image, fitSizeMaxPct: Math.max(10, Math.min(100, Math.round(action.fitSizeMaxPct))) },
+      };
     case 'image/setFitNoUpscale':
       return { ...state, image: { ...state.image, fitNoUpscale: action.fitNoUpscale } };
     case 'image/resetAll':

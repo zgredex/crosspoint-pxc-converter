@@ -60,6 +60,7 @@ export type ImageState = {
   editorMaxZoom: number;
   sourceDims: ImageDims | null;
   fitSizePct: number;
+  fitSizeMaxPct: number;
   fitNoUpscale: boolean;
   fitLockNative: boolean;
 };
@@ -116,6 +117,7 @@ export const initialImageState: ImageState = {
   editorMaxZoom: 1.0,
   sourceDims: null,
   fitSizePct: 100,
+  fitSizeMaxPct: 100,
   fitNoUpscale: true,
   fitLockNative: false,
 };

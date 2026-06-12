@@ -7,6 +7,7 @@ import type { AppStore } from '../../src/app/store';
 import { bumpSharedBufferVersion, commitGeometry, createImageRuntime } from '../../src/app/runtime/imageRuntime';
 import { createOutputRuntime } from '../../src/app/runtime/outputRuntime';
 import { createImageController } from '../../src/features/image/controller';
+import { computeMaxFitSizePct } from '../../src/domain/geometry';
 import type { WorkerOutMessage } from '../../src/infra/worker/workerProtocol';
 
 const {
@@ -602,5 +603,66 @@ describe('image controller', () => {
     showError.mockClear();
     worker.emitError({ type: 'error', phase: 'set-base-raster', version: 99, message: 'sab boom' });
     expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('applyGeometry syncs fitSizeMaxPct from the box selection', async () => {
+    const MockImage = stubHtmlImageElement();
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    renderImageBaseRasterMock.mockResolvedValue();
+
+    const store = createMockStore({
+      ...initialAppState,
+      loadedType: 'image',
+      image: { ...initialAppState.image, sourceDims: { width: 100, height: 100 } },
+    });
+    const runtime = createImageRuntime();
+    runtime.loadedImg = new MockImage(100, 100) as unknown as HTMLImageElement;
+    commitGeometry(runtime, {
+      displayScale: 1,
+      workScale: 1,
+      dispImgW: 100,
+      dispImgH: 100,
+      boxW: 40,
+      boxH: 40,
+      boxX: 20,
+      boxY: 20,
+    });
+
+    const controller = createImageController({
+      store,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker: createMockWorker(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
+      clearSnap: vi.fn(),
+    });
+
+    await controller.resetEditor();
+
+    const maxPctActions = (store.actions as Array<{ type: string; fitSizeMaxPct?: number }>).filter(
+      a => a.type === 'image/setFitSizeMaxPct',
+    );
+    expect(maxPctActions.length).toBeGreaterThan(0);
+
+    const expectedMaxPct = computeMaxFitSizePct({
+      sourceW: runtime.boxW / runtime.displayScale,
+      sourceH: runtime.boxH / runtime.displayScale,
+      targetW: store.getState().device.targetW,
+      targetH: store.getState().device.targetH,
+    });
+    const lastAction = maxPctActions[maxPctActions.length - 1];
+    expect(lastAction.fitSizeMaxPct).toBe(expectedMaxPct);
+    expect(store.getState().image.fitSizeMaxPct).toBe(expectedMaxPct);
+
+    vi.unstubAllGlobals();
+    renderImageBaseRasterMock.mockReset();
   });
 });

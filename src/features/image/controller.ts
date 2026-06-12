@@ -21,6 +21,7 @@ import {
   clampBoxForMode,
   clampBoxToDevice,
   computeEditorGeometry,
+  computeMaxFitSizePct,
   getImageAnalysisRegion,
   mirrorBoxRect,
   rotateBoxRect,
@@ -53,6 +54,7 @@ export type ImageController = {
   getMaxEditorZoom(): number;
   toggleMirrorH(): void;
   toggleMirrorV(): void;
+  syncFitSizeMaxPct(): void;
 };
 
 export type ImageControllerElements = {
@@ -426,6 +428,24 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     if (Math.abs(state.image.editorMaxZoom - geom.maxZoom) > 1e-4) {
       deps.store.dispatch(actions.imageSetEditorMaxZoom(geom.maxZoom));
     }
+    syncFitSizeMaxPct();
+  }
+
+  // The no-upscale ceiling depends on the box selection (the render plan's baseScale is
+  // box-derived), so it must be recomputed whenever the box size changes and threaded into
+  // state for ui/render — same pattern as editorMaxZoom above.
+  function syncFitSizeMaxPct(): void {
+    if (deps.runtime.displayScale <= 0 || deps.runtime.boxW <= 0 || deps.runtime.boxH <= 0) return;
+    const state = getState();
+    const maxPct = computeMaxFitSizePct({
+      sourceW: deps.runtime.boxW / deps.runtime.displayScale,
+      sourceH: deps.runtime.boxH / deps.runtime.displayScale,
+      targetW: state.device.targetW,
+      targetH: state.device.targetH,
+    });
+    if (maxPct !== state.image.fitSizeMaxPct) {
+      deps.store.dispatch(actions.imageSetFitSizeMaxPct(maxPct));
+    }
   }
 
   function getMaxEditorZoom(): number {
@@ -609,5 +629,6 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     getMaxEditorZoom,
     toggleMirrorH,
     toggleMirrorV,
+    syncFitSizeMaxPct,
   };
 }
