@@ -39,6 +39,14 @@ export function getQuantThresholds(p: QuantPreset): QuantThresholds {
   return PROFILES[p].thresholds;
 }
 
+// Threshold triple the conversion actually bins with: error diffusion (and, approximately, the
+// ordered modes) selects bins via ditherThresholds; with dithering off, quantize() uses the hard
+// triple. The histogram zones/markers must match whichever path is active.
+export function getActiveQuantThresholds(p: QuantPreset, ditherEnabled: boolean): QuantThresholds {
+  const profile = PROFILES[p];
+  return ditherEnabled ? profile.ditherThresholds : profile.thresholds;
+}
+
 export function quantize(v: number, t: QuantThresholds): 0 | 1 | 2 | 3 {
   if (v < t[0]) return 0;
   if (v < t[1]) return 1;

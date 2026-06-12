@@ -4,7 +4,7 @@ import { actions } from '../../src/app/actions';
 import { reducer } from '../../src/app/reducer';
 import { initialAppState } from '../../src/app/state';
 import type { AppStore } from '../../src/app/store';
-import { commitGeometry, createImageRuntime } from '../../src/app/runtime/imageRuntime';
+import { bumpSharedBufferVersion, commitGeometry, createImageRuntime } from '../../src/app/runtime/imageRuntime';
 import { createOutputRuntime } from '../../src/app/runtime/outputRuntime';
 import { createImageController } from '../../src/features/image/controller';
 import type { WorkerOutMessage } from '../../src/infra/worker/workerProtocol';
@@ -28,6 +28,11 @@ const {
     moveTo: vi.fn(),
     lineTo: vi.fn(),
     stroke: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    translate: vi.fn(),
+    rotate: vi.fn(),
+    scale: vi.fn(),
     imageSmoothingEnabled: true,
     imageSmoothingQuality: 'high',
   } as unknown as CanvasRenderingContext2D,
@@ -451,6 +456,151 @@ describe('image controller', () => {
 
     showError.mockClear();
     worker.emitError({ type: 'error', phase: 'process', version: 1, message: 'stale' });
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('mirror toggles dispatch their own flag at rotation 0', () => {
+    const MockImage = stubHtmlImageElement();
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    renderImageBaseRasterMock.mockResolvedValue();
+
+    const store = createMockStore({
+      ...initialAppState,
+      loadedType: 'image',
+      image: { ...initialAppState.image, sourceDims: { width: 100, height: 100 } },
+    });
+    const runtime = createImageRuntime();
+    runtime.loadedImg = new MockImage(100, 100) as unknown as HTMLImageElement;
+    commitGeometry(runtime, {
+      displayScale: 1,
+      workScale: 1,
+      dispImgW: 100,
+      dispImgH: 100,
+      boxW: 40,
+      boxH: 40,
+      boxX: 20,
+      boxY: 20,
+    });
+
+    const controller = createImageController({
+      store,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker: createMockWorker(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
+      clearSnap: vi.fn(),
+    });
+
+    store.actions.length = 0;
+    controller.toggleMirrorH();
+    expect(store.actions).toContainEqual({ type: 'image/toggleMirrorH' });
+    expect(store.actions).not.toContainEqual({ type: 'image/toggleMirrorV' });
+
+    store.actions.length = 0;
+    controller.toggleMirrorV();
+    expect(store.actions).toContainEqual({ type: 'image/toggleMirrorV' });
+    expect(store.actions).not.toContainEqual({ type: 'image/toggleMirrorH' });
+
+    vi.unstubAllGlobals();
+    renderImageBaseRasterMock.mockReset();
+  });
+
+  it('mirror toggles swap flags at rotation 90 (view-space semantics)', () => {
+    const MockImage = stubHtmlImageElement();
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    renderImageBaseRasterMock.mockResolvedValue();
+
+    const store = createMockStore({
+      ...initialAppState,
+      loadedType: 'image',
+      image: { ...initialAppState.image, rotation: 90, sourceDims: { width: 100, height: 100 } },
+    });
+    const runtime = createImageRuntime();
+    runtime.loadedImg = new MockImage(100, 100) as unknown as HTMLImageElement;
+    commitGeometry(runtime, {
+      displayScale: 1,
+      workScale: 1,
+      dispImgW: 100,
+      dispImgH: 100,
+      boxW: 40,
+      boxH: 40,
+      boxX: 20,
+      boxY: 20,
+    });
+
+    const controller = createImageController({
+      store,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker: createMockWorker(),
+      host: {
+        clearStatus: vi.fn(),
+        showError: vi.fn(),
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
+      clearSnap: vi.fn(),
+    });
+
+    store.actions.length = 0;
+    controller.toggleMirrorH();
+    // At rotation 90, display-H corresponds to source-V flag
+    expect(store.actions).toContainEqual({ type: 'image/toggleMirrorV' });
+    expect(store.actions).not.toContainEqual({ type: 'image/toggleMirrorH' });
+
+    store.actions.length = 0;
+    controller.toggleMirrorV();
+    // At rotation 90, display-V corresponds to source-H flag
+    expect(store.actions).toContainEqual({ type: 'image/toggleMirrorH' });
+    expect(store.actions).not.toContainEqual({ type: 'image/toggleMirrorV' });
+
+    vi.unstubAllGlobals();
+    renderImageBaseRasterMock.mockReset();
+  });
+
+  it('surfaces set-base-raster errors validated against sharedBufferVersion', () => {
+    const worker = createMockWorker();
+    const store = createMockStore({
+      ...initialAppState,
+      loadedType: 'image',
+    });
+    const runtime = createImageRuntime();
+    runtime.processVersion = 7;
+    bumpSharedBufferVersion(runtime); // sharedBufferVersion becomes 1
+    const showError = vi.fn();
+
+    createImageController({
+      store,
+      elements: createMockElements(),
+      runtime,
+      output: createOutputRuntime(),
+      pica: { resize: vi.fn() },
+      worker,
+      host: {
+        clearStatus: vi.fn(),
+        showError,
+        clearHistogramView: vi.fn(),
+        resetSession: vi.fn(),
+      },
+      clearSnap: vi.fn(),
+    });
+
+    worker.emitError({ type: 'error', phase: 'set-base-raster', version: 1, message: 'sab boom' });
+    expect(showError).toHaveBeenCalledWith(expect.stringContaining('sab boom'));
+
+    showError.mockClear();
+    worker.emitError({ type: 'error', phase: 'set-base-raster', version: 99, message: 'sab boom' });
     expect(showError).not.toHaveBeenCalled();
   });
 });

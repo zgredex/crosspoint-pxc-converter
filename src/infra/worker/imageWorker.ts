@@ -31,7 +31,16 @@ function processMessage(e: MessageEvent<WorkerInMessage>): void {
   }
 
   if (msg.type === 'process') {
-    if (!baseRaster) return;
+    if (!baseRaster) {
+      const error: WorkerOutMessage = {
+        type: 'error',
+        phase: 'process',
+        version: msg.version,
+        message: 'base raster unavailable (set-base-raster failed or was never sent)',
+      };
+      self.postMessage(error);
+      return;
+    }
 
     const { settings, version } = msg;
     try {

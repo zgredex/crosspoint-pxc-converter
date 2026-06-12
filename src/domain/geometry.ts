@@ -82,6 +82,20 @@ export function rotateBoxRect(
   return { ...box };
 }
 
+// Reflect a crop-box rect across the displayed frame's vertical center line ('h' = horizontal
+// flip) or horizontal center line ('v' = vertical flip), in editor display coords. Pure sibling
+// of rotateBoxRect; the mirror toggles use it so the selection tracks the flipped content.
+export function mirrorBoxRect(
+  box: { x: number; y: number; w: number; h: number },
+  dispW: number,
+  dispH: number,
+  axis: 'h' | 'v',
+): { x: number; y: number; w: number; h: number } {
+  return axis === 'h'
+    ? { x: dispW - box.x - box.w, y: box.y, w: box.w, h: box.h }
+    : { x: box.x, y: dispH - box.y - box.h, w: box.w, h: box.h };
+}
+
 // Largest fit-size percent that doesn't upscale the source. When the source already fills (or
 // overflows) the device on some axis, full fit is a downscale and the slider's whole 10–100%
 // range applies. The 10% floor matches the reducer's fitSizePct clamp.

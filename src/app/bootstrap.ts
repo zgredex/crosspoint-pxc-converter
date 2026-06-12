@@ -8,7 +8,7 @@ import { createOutputRuntime } from './runtime/outputRuntime';
 import { resetSession } from './sessionReset';
 import { store } from './store';
 import { validateGbBytes } from './validation';
-import { getQuantThresholds } from '../domain/quantize';
+import { getActiveQuantThresholds } from '../domain/quantize';
 import { clearHistogram, mountHistogramAutoResize } from '../infra/canvas/histogramRenderer';
 import { createPicaResizer } from '../infra/canvas/picaResize';
 import { createImageWorkerClient } from '../infra/worker/imageWorkerClient';
@@ -88,7 +88,10 @@ mountHistogramAutoResize({
   canvas: histogramCanvas,
   getHistogram: () => imageRuntime.lastHistogram,
   getTotalPixels: () => store.getState().device.totalPixels,
-  getThresholds: () => getQuantThresholds(store.getState().quantPreset),
+  getThresholds: () => {
+    const state = store.getState();
+    return getActiveQuantThresholds(state.quantPreset, state.image.ditherEnabled);
+  },
 });
 
 imageController = createImageController({

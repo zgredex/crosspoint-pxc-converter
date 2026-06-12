@@ -22,12 +22,13 @@ import {
   clampBoxToDevice,
   computeEditorGeometry,
   getImageAnalysisRegion,
+  mirrorBoxRect,
   rotateBoxRect,
   type EditorGeometry,
   type ImageRenderPlan,
 } from '../../domain/geometry';
 import { buildUintHistogram } from '../../domain/histogram';
-import { getQuantThresholds } from '../../domain/quantize';
+import { getActiveQuantThresholds } from '../../domain/quantize';
 import { buildLuminanceBuffer, computeAutoLevels } from '../../domain/tone';
 import { loadImageFromDataUrl, readFileAsDataUrl } from '../../infra/browser/imageLoader';
 import { renderHistogram } from '../../infra/canvas/histogramRenderer';
@@ -144,7 +145,7 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
     deps.runtime.lastHistogram = new Float32Array(result.histogram);
 
     renderIndexedPreview(deps.elements.previewCanvas, deps.runtime.lastIndexedPixels, state.device.targetW, state.device.targetH);
-    renderHistogram(deps.elements.histogramCanvas, deps.runtime.lastHistogram, state.device.totalPixels, getQuantThresholds(state.quantPreset));
+    renderHistogram(deps.elements.histogramCanvas, deps.runtime.lastHistogram, state.device.totalPixels, getActiveQuantThresholds(state.quantPreset, state.image.ditherEnabled));
     deps.store.dispatch(actions.outputSetReady(true, true));
 
     processing = false;
@@ -154,8 +155,15 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
   // Worker-side errors must reset the single-flight gate; otherwise `processing` stays true and
   // every subsequent slider tweak only sets `processRequested`, locking the convert pipeline.
   deps.worker.onError((error) => {
-    // Stale failures (from a superseded version or an old session) are already irrelevant; ignore.
-    if (error.version !== -1 && error.version !== deps.runtime.processVersion) return;
+    // Stale failures are irrelevant; ignore them. The two phases use different version namespaces:
+    // 'process' errors carry processVersion, 'set-base-raster' errors carry sharedBufferVersion.
+    // -1 is the worker-crash catch-all and is always accepted.
+    if (error.version !== -1) {
+      const current = error.phase === 'set-base-raster'
+        ? deps.runtime.sharedBufferVersion
+        : deps.runtime.processVersion;
+      if (error.version !== current) return;
+    }
     if (inFlightProcessSession !== null && !isCurrentSession(inFlightProcessSession)) return;
     processing = false;
     inFlightProcessSession = null;
@@ -203,18 +211,36 @@ export function createImageController(deps: ImageControllerDeps): ImageControlle
 
   function toggleMirrorH(): void {
     notifyCropRegionChanged();
+    // Mirror flags are source-space (applied before rotation in buildRotatedSource), so at 90°/270°
+    // the display-horizontal flip corresponds to the source-vertical flag and vice versa.
+    // The box reflection always follows the button's display axis.
     if (deps.runtime.loadedImg && deps.runtime.dispImgW > 0) {
-      setBoxPosition(deps.runtime, deps.runtime.dispImgW - deps.runtime.boxX - deps.runtime.boxW, deps.runtime.boxY);
+      const m = mirrorBoxRect(
+        { x: deps.runtime.boxX, y: deps.runtime.boxY, w: deps.runtime.boxW, h: deps.runtime.boxH },
+        deps.runtime.dispImgW,
+        deps.runtime.dispImgH,
+        'h',
+      );
+      setBoxPosition(deps.runtime, m.x, m.y);
     }
-    dispatchAndRetransform(actions.imageToggleMirrorH());
+    const rotated90or270 = getState().image.rotation % 180 !== 0;
+    dispatchAndRetransform(rotated90or270 ? actions.imageToggleMirrorV() : actions.imageToggleMirrorH());
   }
 
   function toggleMirrorV(): void {
     notifyCropRegionChanged();
+    // Same display-axis/source-flag swap as toggleMirrorH, with the axes exchanged.
     if (deps.runtime.loadedImg && deps.runtime.dispImgH > 0) {
-      setBoxPosition(deps.runtime, deps.runtime.boxX, deps.runtime.dispImgH - deps.runtime.boxY - deps.runtime.boxH);
+      const m = mirrorBoxRect(
+        { x: deps.runtime.boxX, y: deps.runtime.boxY, w: deps.runtime.boxW, h: deps.runtime.boxH },
+        deps.runtime.dispImgW,
+        deps.runtime.dispImgH,
+        'v',
+      );
+      setBoxPosition(deps.runtime, m.x, m.y);
     }
-    dispatchAndRetransform(actions.imageToggleMirrorV());
+    const rotated90or270 = getState().image.rotation % 180 !== 0;
+    dispatchAndRetransform(rotated90or270 ? actions.imageToggleMirrorH() : actions.imageToggleMirrorV());
   }
 
   function unloadImage(): void {

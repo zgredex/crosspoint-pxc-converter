@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_QUANT_PRESET, GRAY_DISP, getQuantThresholds, getQuantProfile, quantize } from '../../src/domain/quantize';
+import { DEFAULT_QUANT_PRESET, GRAY_DISP, getQuantThresholds, getQuantProfile, getActiveQuantThresholds, quantize } from '../../src/domain/quantize';
 
 describe('quantize', () => {
   it('exports the display grayscale palette', () => {
@@ -43,5 +43,20 @@ describe('quantize', () => {
       ditherThresholds: [30, 50, 140],
       ditherLevels: [15, 30, 80, 210],
     });
+  });
+});
+
+describe('getActiveQuantThresholds', () => {
+  it('pr1614 dither-on and dither-off both return [42, 127, 212] (triples coincide)', () => {
+    expect(getActiveQuantThresholds('pr1614', true)).toEqual([42, 127, 212]);
+    expect(getActiveQuantThresholds('pr1614', false)).toEqual([42, 127, 212]);
+  });
+
+  it('master dither-on returns the dither triple [30, 50, 140]', () => {
+    expect(getActiveQuantThresholds('master', true)).toEqual([30, 50, 140]);
+  });
+
+  it('master dither-off returns the hard triple [45, 70, 140]', () => {
+    expect(getActiveQuantThresholds('master', false)).toEqual([45, 70, 140]);
   });
 });

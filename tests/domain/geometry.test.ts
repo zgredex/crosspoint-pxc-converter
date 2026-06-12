@@ -7,6 +7,7 @@ import {
   computeMaxFitSizePct,
   fitOffset,
   getImageAnalysisRegion,
+  mirrorBoxRect,
   rotatedSourceDims,
   rotateBoxRect,
 } from '../../src/domain/geometry';
@@ -393,5 +394,35 @@ describe('rotateBoxRect', () => {
       [dw, dh] = [dh, dw];
     }
     expect(box).toEqual(BOX);
+  });
+});
+
+describe('mirrorBoxRect', () => {
+  // box {x:10, y:20, w:30, h:40} in 200×100 frame
+  const BOX = { x: 10, y: 20, w: 30, h: 40 };
+  const DISP_W = 200;
+  const DISP_H = 100;
+
+  it("'h' reflects across the vertical center line: x becomes dispW - x - w", () => {
+    // dispW - x - w = 200 - 10 - 30 = 160; y, w, h unchanged
+    expect(mirrorBoxRect(BOX, DISP_W, DISP_H, 'h')).toEqual({ x: 160, y: 20, w: 30, h: 40 });
+  });
+
+  it("'v' reflects across the horizontal center line: y becomes dispH - y - h", () => {
+    // dispH - y - h = 100 - 20 - 40 = 40; x, w, h unchanged
+    expect(mirrorBoxRect(BOX, DISP_W, DISP_H, 'v')).toEqual({ x: 10, y: 40, w: 30, h: 40 });
+  });
+
+  it('involution: applying the same axis twice returns the original rect (both axes)', () => {
+    const afterHH = mirrorBoxRect(mirrorBoxRect(BOX, DISP_W, DISP_H, 'h'), DISP_W, DISP_H, 'h');
+    expect(afterHH).toEqual(BOX);
+    const afterVV = mirrorBoxRect(mirrorBoxRect(BOX, DISP_W, DISP_H, 'v'), DISP_W, DISP_H, 'v');
+    expect(afterVV).toEqual(BOX);
+  });
+
+  it("a centered box is a fixed point under 'h': box {x:85,y:30,w:30,h:40} in 200×100", () => {
+    // dispW - x - w = 200 - 85 - 30 = 85 (same x — centered horizontally)
+    const centeredBox = { x: 85, y: 30, w: 30, h: 40 };
+    expect(mirrorBoxRect(centeredBox, DISP_W, DISP_H, 'h')).toEqual(centeredBox);
   });
 });

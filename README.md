@@ -84,7 +84,7 @@ CrossPoint picks at random from `/.sleep/` when multiple files are present. PXC 
 - **Crop / Fit modes** — crop selects a viewport that fills the device exactly; fit letterboxes the whole source. The crop window snaps when its centre aligns with the source centre.
 - **Fit alignment** — 3×3 grid (top-left through bottom-right) controls placement of the letterboxed image. The unused area fills with the chosen background colour (white or black).
 - **Rotation** — 90° clockwise / counter-clockwise steps.
-- **Mirror** — horizontal and vertical flips, applied independently. The crop selection is preserved across rotation and mirror operations.
+- **Mirror** — independent horizontal and vertical flips of the current view (H always flips left-right on screen, V always flips top-bottom, even when the image is rotated 90°/270°). The crop selection is preserved across rotation and mirror operations.
 - **Zoom** — continuous slider from 1× to a per-image maximum (capped so the source never upscales beyond its native pixels), plus mouse-wheel zoom anchored at the cursor.
 - **Scrollable viewport** — the source panel pans when the zoomed image exceeds its frame; scroll position is preserved during zoom changes.
 - **Source label** — displays the loaded asset's natural pixel dimensions, e.g. `Source · 1920×1080 — drag or click to reposition`.
